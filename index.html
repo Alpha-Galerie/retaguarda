@@ -1296,47 +1296,8 @@
 
   async function loadVariacoesForProducts(productIds) {
     var primary = await loadVariacoesFromTable('variacoes', productIds);
-    if (!primary.available) {
-      return { table: 'produto_variacoes', variacoes: (await loadVariacoesFromTable('produto_variacoes', productIds)).variacoes };
-    }
 
-    var legacy = await loadVariacoesFromTable('produto_variacoes', productIds);
-    if (!legacy.available || !legacy.variacoes.length) {
-      return { table: 'variacoes', variacoes: primary.variacoes };
-    }
-
-    var byProduto = {};
-    primary.variacoes.forEach(function(v) {
-      var key = String(v.produto_id);
-      if (!byProduto[key]) byProduto[key] = [];
-      byProduto[key].push(v);
-    });
-
-    legacy.variacoes.forEach(function(v) {
-      var key = String(v.produto_id);
-      if (!byProduto[key] || !byProduto[key].length) {
-        byProduto[key] = [v];
-      }
-    });
-
-    var merged = [];
-    Object.keys(byProduto).forEach(function(key) {
-      merged = merged.concat(byProduto[key]);
-    });
-
-    merged.sort(function(a, b) {
-      var produtoA = String(a.produto_id);
-      var produtoB = String(b.produto_id);
-      if (produtoA < produtoB) return -1;
-      if (produtoA > produtoB) return 1;
-      var ordemA = Number(a.ordem || 0);
-      var ordemB = Number(b.ordem || 0);
-      if (ordemA < ordemB) return -1;
-      if (ordemA > ordemB) return 1;
-      return Number(a.id || 0) - Number(b.id || 0);
-    });
-
-    return { table: 'variacoes', variacoes: merged };
+    return { table: 'variacoes', variacoes: primary.available ? primary.variacoes : [] };
   }
 
   async function persistVariacoes(table, removedIds, currentVariacoes, prodId) {
@@ -1435,13 +1396,24 @@
       // sem índice na coluna nome. Solução: trazer sem ordem e ordenar no JS (instantâneo).
       // Também removido JOIN com categorias (PGRST201 ambíguo) - merge feito no JS abaixo.
       var COLS = 'id,nome,codigo,codigo_barras,marca,descricao,preco,preco_pix,categoria_id,subcategoria,estoque,ativo,destaque,imagem_url,criado_em';
-      var res = await sb.from('produtos').select(COLS).limit(600);
-      if (res.error) {
-        console.warn('Erro ao carregar produtos:', res.error);
-        throw res.error;
+      var CHUNK_SIZE = 200;
+      var MAX_ROWS = 600;
+      var all = [];
+
+      for (var offset = 0; offset < MAX_ROWS; offset += CHUNK_SIZE) {
+        var to = Math.min(offset + CHUNK_SIZE - 1, MAX_ROWS - 1);
+        var res = await sb.from('produtos').select(COLS).range(offset, to);
+        if (res.error) {
+          console.warn('Erro ao carregar produtos:', res.error);
+          throw res.error;
+        }
+
+        var chunk = res.data || [];
+        all = all.concat(chunk);
+        if (chunk.length < CHUNK_SIZE) break;
       }
 
-      allProducts = res.data || [];
+      allProducts = all;
 
       // Ordena por nome no JS (instantâneo, sem custo de banco)
       allProducts.sort(function(a, b) {
@@ -2091,31 +2063,7 @@
       }
 
       // -- Salvar variações --
-      // 1. Deletar as removidas
-      if (variacoesRemovidas.length) {
-        await sb.from('produto_variacoes').delete().in('id', variacoesRemovidas);
-      }
-
-      // 2. Para cada variação com nome preenchido:
-      var varsValidas = variacoes.filter(function(v) { return (v.nome || '').trim(); });
-      for (var i = 0; i < varsValidas.length; i++) {
-        var v = varsValidas[i];
-        var payload = {
-          produto_id: prodId,
-          nome: v.nome.trim(),
-          preco: v.preco != null ? v.preco : null,
-          estoque: parseInt(v.estoque) || 0,
-          ativo: true,
-          ordem: i,
-        };
-        if (v.id) {
-          // Atualizar existente
-          await sb.from('produto_variacoes').update(payload).eq('id', v.id);
-        } else {
-          // Inserir nova
-          await sb.from('produto_variacoes').insert(payload);
-        }
-      }
+      await persistVariacoes('variacoes', variacoesRemovidas, variacoes, prodId);
 
       closeModal('prodModal');
       await loadProducts();
