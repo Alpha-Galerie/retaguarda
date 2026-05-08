@@ -1265,6 +1265,105 @@
   // ============================================
   function getSenha() { return '1234'; }
 
+  function isMissingTableError(error) {
+    if (!error) return false;
+    var message = String(error.message || error || '').toLowerCase();
+    return error.code === '42P01' || message.includes('does not exist') || message.includes('relation');
+  }
+
+  async function loadVariacoesFromTable(table, productIds) {
+    // FIX: Removed .order() to prevent timeout with large datasets. Sorting done in JavaScript.
+    var res = await sb.from(table).select('*').in('produto_id', productIds);
+
+    if (res.error) {
+      if (isMissingTableError(res.error)) {
+        return { table: table, available: false, variacoes: [] };
+      }
+      throw res.error;
+    }
+
+    var variacoes = res.data || [];
+    // Sort by ordem, then id to maintain consistent ordering
+    variacoes.sort(function(a, b) {
+      var ordemA = Number(a.ordem || 0);
+      var ordemB = Number(b.ordem || 0);
+      if (ordemA !== ordemB) return ordemA - ordemB;
+      return Number(a.id || 0) - Number(b.id || 0);
+    });
+
+    return { table: table, available: true, variacoes: variacoes };
+  }
+
+  async function loadVariacoesForProducts(productIds) {
+    var primary = await loadVariacoesFromTable('variacoes', productIds);
+    if (!primary.available) {
+      return { table: 'produto_variacoes', variacoes: (await loadVariacoesFromTable('produto_variacoes', productIds)).variacoes };
+    }
+
+    var legacy = await loadVariacoesFromTable('produto_variacoes', productIds);
+    if (!legacy.available || !legacy.variacoes.length) {
+      return { table: 'variacoes', variacoes: primary.variacoes };
+    }
+
+    var byProduto = {};
+    primary.variacoes.forEach(function(v) {
+      var key = String(v.produto_id);
+      if (!byProduto[key]) byProduto[key] = [];
+      byProduto[key].push(v);
+    });
+
+    legacy.variacoes.forEach(function(v) {
+      var key = String(v.produto_id);
+      if (!byProduto[key] || !byProduto[key].length) {
+        byProduto[key] = [v];
+      }
+    });
+
+    var merged = [];
+    Object.keys(byProduto).forEach(function(key) {
+      merged = merged.concat(byProduto[key]);
+    });
+
+    merged.sort(function(a, b) {
+      var produtoA = String(a.produto_id);
+      var produtoB = String(b.produto_id);
+      if (produtoA < produtoB) return -1;
+      if (produtoA > produtoB) return 1;
+      var ordemA = Number(a.ordem || 0);
+      var ordemB = Number(b.ordem || 0);
+      if (ordemA < ordemB) return -1;
+      if (ordemA > ordemB) return 1;
+      return Number(a.id || 0) - Number(b.id || 0);
+    });
+
+    return { table: 'variacoes', variacoes: merged };
+  }
+
+  async function persistVariacoes(table, removedIds, currentVariacoes, prodId) {
+    if (removedIds.length) {
+      await sb.from(table).delete().in('id', removedIds);
+    }
+
+    var varsValidas = currentVariacoes.filter(function(v) { return (v.nome || '').trim(); });
+    for (var i = 0; i < varsValidas.length; i++) {
+      var v = varsValidas[i];
+      var payload = {
+        produto_id: prodId,
+        nome: v.nome.trim(),
+        preco: v.preco != null ? v.preco : null,
+        estoque: parseInt(v.estoque) || 0,
+        ativo: true,
+        ordem: i,
+      };
+
+      if (v.id) {
+        await sb.from(table).update(payload).eq('id', v.id);
+      } else {
+        await sb.from(table).insert(payload);
+      }
+    }
+  }
+
   // ============================================
   // LOGIN / LOGOUT
   // ============================================
