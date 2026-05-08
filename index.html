@@ -1272,7 +1272,8 @@
   }
 
   async function loadVariacoesFromTable(table, productIds) {
-    var res = await sb.from(table).select('*').in('produto_id', productIds).order('ordem').order('id');
+    // FIX: Removed .order() to prevent timeout with large datasets. Sorting done in JavaScript.
+    var res = await sb.from(table).select('*').in('produto_id', productIds);
 
     if (res.error) {
       if (isMissingTableError(res.error)) {
@@ -1281,7 +1282,16 @@
       throw res.error;
     }
 
-    return { table: table, available: true, variacoes: res.data || [] };
+    var variacoes = res.data || [];
+    // Sort by ordem, then id to maintain consistent ordering
+    variacoes.sort(function(a, b) {
+      var ordemA = Number(a.ordem || 0);
+      var ordemB = Number(b.ordem || 0);
+      if (ordemA !== ordemB) return ordemA - ordemB;
+      return Number(a.id || 0) - Number(b.id || 0);
+    });
+
+    return { table: table, available: true, variacoes: variacoes };
   }
 
   async function loadVariacoesForProducts(productIds) {
