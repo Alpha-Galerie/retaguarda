@@ -1296,47 +1296,8 @@
 
   async function loadVariacoesForProducts(productIds) {
     var primary = await loadVariacoesFromTable('variacoes', productIds);
-    if (!primary.available) {
-      return { table: 'produto_variacoes', variacoes: (await loadVariacoesFromTable('produto_variacoes', productIds)).variacoes };
-    }
 
-    var legacy = await loadVariacoesFromTable('produto_variacoes', productIds);
-    if (!legacy.available || !legacy.variacoes.length) {
-      return { table: 'variacoes', variacoes: primary.variacoes };
-    }
-
-    var byProduto = {};
-    primary.variacoes.forEach(function(v) {
-      var key = String(v.produto_id);
-      if (!byProduto[key]) byProduto[key] = [];
-      byProduto[key].push(v);
-    });
-
-    legacy.variacoes.forEach(function(v) {
-      var key = String(v.produto_id);
-      if (!byProduto[key] || !byProduto[key].length) {
-        byProduto[key] = [v];
-      }
-    });
-
-    var merged = [];
-    Object.keys(byProduto).forEach(function(key) {
-      merged = merged.concat(byProduto[key]);
-    });
-
-    merged.sort(function(a, b) {
-      var produtoA = String(a.produto_id);
-      var produtoB = String(b.produto_id);
-      if (produtoA < produtoB) return -1;
-      if (produtoA > produtoB) return 1;
-      var ordemA = Number(a.ordem || 0);
-      var ordemB = Number(b.ordem || 0);
-      if (ordemA < ordemB) return -1;
-      if (ordemA > ordemB) return 1;
-      return Number(a.id || 0) - Number(b.id || 0);
-    });
-
-    return { table: 'variacoes', variacoes: merged };
+    return { table: 'variacoes', variacoes: primary.available ? primary.variacoes : [] };
   }
 
   async function persistVariacoes(table, removedIds, currentVariacoes, prodId) {
@@ -2102,19 +2063,7 @@
       }
 
       // -- Salvar variações --
-      // Preferir a tabela nova `variacoes`, mas preservar compatibilidade com a tabela antiga.
-      var variacoesTable = 'variacoes';
-      try {
-        await persistVariacoes(variacoesTable, variacoesRemovidas, variacoes, prodId);
-      } catch (variacoesError) {
-        if (isMissingTableError(variacoesError)) {
-          console.warn('Tabela variacoes não encontrada, gravando no fallback produto_variacoes.');
-          variacoesTable = 'produto_variacoes';
-          await persistVariacoes(variacoesTable, variacoesRemovidas, variacoes, prodId);
-        } else {
-          throw variacoesError;
-        }
-      }
+      await persistVariacoes('variacoes', variacoesRemovidas, variacoes, prodId);
 
       closeModal('prodModal');
       await loadProducts();
