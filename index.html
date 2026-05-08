@@ -1463,11 +1463,11 @@
       // Buscar todas as variações de uma vez. Se a tabela ainda não existir, não trava o catálogo.
       var ids = allProducts.map(function(p) { return p.id; });
       if (ids.length) {
-        var variacoesInfo = await loadVariacoesForProducts(ids);
-        if (variacoesInfo.table !== 'variacoes') {
-          console.warn('Tabela principal de variações indisponível, usando fallback:', variacoesInfo.table || 'nenhuma');
+        var resV = await sb.from('produto_variacoes').select('*').in('produto_id', ids).order('ordem').order('id');
+        if (resV.error) {
+          console.warn('Erro ao carregar variações:', resV.error);
         }
-        var todasVars = variacoesInfo.variacoes;
+        var todasVars = resV.data || [];
         allProducts.forEach(function(p) {
           p._variacoes = todasVars.filter(function(v) { return String(v.produto_id) === String(p.id); });
         });
@@ -2091,17 +2091,29 @@
       }
 
       // -- Salvar variações --
-      // Preferir a tabela nova `variacoes`, mas preservar compatibilidade com a tabela antiga.
-      var variacoesTable = 'variacoes';
-      try {
-        await persistVariacoes(variacoesTable, variacoesRemovidas, variacoes, prodId);
-      } catch (variacoesError) {
-        if (isMissingTableError(variacoesError)) {
-          console.warn('Tabela variacoes não encontrada, gravando no fallback produto_variacoes.');
-          variacoesTable = 'produto_variacoes';
-          await persistVariacoes(variacoesTable, variacoesRemovidas, variacoes, prodId);
+      // 1. Deletar as removidas
+      if (variacoesRemovidas.length) {
+        await sb.from('produto_variacoes').delete().in('id', variacoesRemovidas);
+      }
+
+      // 2. Para cada variação com nome preenchido:
+      var varsValidas = variacoes.filter(function(v) { return (v.nome || '').trim(); });
+      for (var i = 0; i < varsValidas.length; i++) {
+        var v = varsValidas[i];
+        var payload = {
+          produto_id: prodId,
+          nome: v.nome.trim(),
+          preco: v.preco != null ? v.preco : null,
+          estoque: parseInt(v.estoque) || 0,
+          ativo: true,
+          ordem: i,
+        };
+        if (v.id) {
+          // Atualizar existente
+          await sb.from('produto_variacoes').update(payload).eq('id', v.id);
         } else {
-          throw variacoesError;
+          // Inserir nova
+          await sb.from('produto_variacoes').insert(payload);
         }
       }
 
@@ -2128,7 +2140,7 @@
   }
 
   // ============================================
-  // VARIAÇÕES — banco de dados (variacoes, com fallback legado)
+  // VARIAÇÕES — banco de dados (produto_variacoes)
   // ============================================
   var variacoes = [];      // array local no modal
   var variacoesRemovidas = []; // ids marcados para deletar ao salvar
