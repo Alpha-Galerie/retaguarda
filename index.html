@@ -1435,13 +1435,24 @@
       // sem índice na coluna nome. Solução: trazer sem ordem e ordenar no JS (instantâneo).
       // Também removido JOIN com categorias (PGRST201 ambíguo) - merge feito no JS abaixo.
       var COLS = 'id,nome,codigo,codigo_barras,marca,descricao,preco,preco_pix,categoria_id,subcategoria,estoque,ativo,destaque,imagem_url,criado_em';
-      var res = await sb.from('produtos').select(COLS).limit(600);
-      if (res.error) {
-        console.warn('Erro ao carregar produtos:', res.error);
-        throw res.error;
+      var CHUNK_SIZE = 200;
+      var MAX_ROWS = 600;
+      var all = [];
+
+      for (var offset = 0; offset < MAX_ROWS; offset += CHUNK_SIZE) {
+        var to = Math.min(offset + CHUNK_SIZE - 1, MAX_ROWS - 1);
+        var res = await sb.from('produtos').select(COLS).range(offset, to);
+        if (res.error) {
+          console.warn('Erro ao carregar produtos:', res.error);
+          throw res.error;
+        }
+
+        var chunk = res.data || [];
+        all = all.concat(chunk);
+        if (chunk.length < CHUNK_SIZE) break;
       }
 
-      allProducts = res.data || [];
+      allProducts = all;
 
       // Ordena por nome no JS (instantâneo, sem custo de banco)
       allProducts.sort(function(a, b) {
