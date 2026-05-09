@@ -1435,11 +1435,17 @@
       // Buscar todas as variações de uma vez. Se a tabela ainda não existir, não trava o catálogo.
       var ids = allProducts.map(function(p) { return p.id; });
       if (ids.length) {
-        var resV = await sb.from('produto_variacoes').select('*').in('produto_id', ids).order('ordem').order('id');
+        var resV = await sb.from('variacoes').select('*').in('produto_id', ids);
         if (resV.error) {
           console.warn('Erro ao carregar variações:', resV.error);
         }
         var todasVars = resV.data || [];
+        todasVars.sort(function(a, b) {
+          var ordemA = Number(a.ordem || 0);
+          var ordemB = Number(b.ordem || 0);
+          if (ordemA !== ordemB) return ordemA - ordemB;
+          return Number(a.id || 0) - Number(b.id || 0);
+        });
         allProducts.forEach(function(p) {
           p._variacoes = todasVars.filter(function(v) { return String(v.produto_id) === String(p.id); });
         });
@@ -2088,7 +2094,7 @@
   }
 
   // ============================================
-  // VARIAÇÕES — banco de dados (produto_variacoes)
+  // VARIAÇÕES — banco de dados (variacoes)
   // ============================================
   var variacoes = [];      // array local no modal
   var variacoesRemovidas = []; // ids marcados para deletar ao salvar
