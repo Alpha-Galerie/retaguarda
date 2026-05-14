@@ -59,69 +59,78 @@
       display: flex;
       align-items: center;
       justify-content: center;
-        // Carregamento progressivo por id para evitar OFFSET caro e abrir a tela rápido.
-      border: 1.5px solid var(--gold);
-        var firstRes = await sb.from('produtos').select(COLS).range(0, CHUNK_SIZE - 1);
-        var firstRes = await sb.from('produtos').select(COLS).order('id', { ascending: true }).limit(CHUNK_SIZE);
-        if (firstRes.error) {
-          console.warn('Erro ao carregar produtos:', firstRes.error);
-          throw firstRes.error;
-        }
-
-        allProducts = (firstRes.data || []).slice();
-        allProducts.sort(function(a, b) {
-          var na = (a.nome || '').toLowerCase();
-          var nb = (b.nome || '').toLowerCase();
-          if (na < nb) return -1;
-          if (na > nb) return 1;
-          return 0;
-        });
-        applyCategoryLinks(allProducts);
-        productsLoaded = true;
-        renderProducts();
-
-        var lastId = allProducts.length ? allProducts[allProducts.length - 1].id : null;
-
-        (async function continueLoading() {
-          try {
-            while (lastId !== null) {
-              var res = await sb.from('produtos').select(COLS).gt('id', lastId).order('id', { ascending: true }).limit(CHUNK_SIZE);
-              if (res.error) {
-                console.warn('Erro ao carregar produtos:', res.error);
-                break;
-              }
-
-              var chunk = res.data || [];
-              if (!chunk.length) break;
-
-              allProducts = allProducts.concat(chunk);
-              allProducts.sort(function(a, b) {
-                var na = (a.nome || '').toLowerCase();
-                var nb = (b.nome || '').toLowerCase();
-                if (na < nb) return -1;
-                if (na > nb) return 1;
-                return 0;
-              });
-              applyCategoryLinks(allProducts);
-              renderProducts();
-
-              lastId = chunk[chunk.length - 1].id;
-              if (chunk.length < CHUNK_SIZE) break;
-            }
-
-            console.log('Produtos carregados:', allProducts);
-          } finally {
-            productsLoading = false;
-          }
-        })();
-
-        return;
+      gap: 12px;
+      margin-bottom: 8px;
     }
-        productsLoading = false;
+    .login-logo-mark {
+      width: 44px; height: 44px;
+      border: 1.5px solid var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-logo-mark::after {
+      content: 'ag';
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: 26px;
+      color: var(--gold);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .login-logo-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+    }
+    .login-sub {
+      text-align: center;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      margin-bottom: 40px;
+    }
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+    .form-group input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 14px 16px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+    .btn {
+      padding: 14px 28px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+    }
+    .btn-gold {
+      background: var(--gold);
       color: #000;
     }
     .btn-gold:hover { background: var(--text); box-shadow: 0 0 30px var(--gold-glow); }
-        productsLoading = false;
+    .btn-ghost {
+      background: transparent;
       color: var(--text-dim);
       border: 1px solid var(--line);
     }
