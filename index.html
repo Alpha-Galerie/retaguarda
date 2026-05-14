@@ -59,78 +59,69 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
-      margin-bottom: 8px;
-    }
-    .login-logo-mark {
-      width: 44px; height: 44px;
+        // Carregamento progressivo por id para evitar OFFSET caro e abrir a tela rápido.
       border: 1.5px solid var(--gold);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+        var firstRes = await sb.from('produtos').select(COLS).range(0, CHUNK_SIZE - 1);
+        var firstRes = await sb.from('produtos').select(COLS).order('id', { ascending: true }).limit(CHUNK_SIZE);
+        if (firstRes.error) {
+          console.warn('Erro ao carregar produtos:', firstRes.error);
+          throw firstRes.error;
+        }
+
+        allProducts = (firstRes.data || []).slice();
+        allProducts.sort(function(a, b) {
+          var na = (a.nome || '').toLowerCase();
+          var nb = (b.nome || '').toLowerCase();
+          if (na < nb) return -1;
+          if (na > nb) return 1;
+          return 0;
+        });
+        applyCategoryLinks(allProducts);
+        productsLoaded = true;
+        renderProducts();
+
+        var lastId = allProducts.length ? allProducts[allProducts.length - 1].id : null;
+
+        (async function continueLoading() {
+          try {
+            while (lastId !== null) {
+              var res = await sb.from('produtos').select(COLS).gt('id', lastId).order('id', { ascending: true }).limit(CHUNK_SIZE);
+              if (res.error) {
+                console.warn('Erro ao carregar produtos:', res.error);
+                break;
+              }
+
+              var chunk = res.data || [];
+              if (!chunk.length) break;
+
+              allProducts = allProducts.concat(chunk);
+              allProducts.sort(function(a, b) {
+                var na = (a.nome || '').toLowerCase();
+                var nb = (b.nome || '').toLowerCase();
+                if (na < nb) return -1;
+                if (na > nb) return 1;
+                return 0;
+              });
+              applyCategoryLinks(allProducts);
+              renderProducts();
+
+              lastId = chunk[chunk.length - 1].id;
+              if (chunk.length < CHUNK_SIZE) break;
+            }
+
+            console.log('Produtos carregados:', allProducts);
+          } finally {
+            productsLoading = false;
+          }
+        })();
+
+        return;
     }
-    .login-logo-mark::after {
-      content: 'ag';
-      font-family: 'Cormorant Garamond', serif;
-      font-style: italic;
-      font-weight: 500;
-      font-size: 26px;
-      color: var(--gold);
-      line-height: 1;
-      letter-spacing: -0.02em;
-    }
-    .login-logo-text {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 22px;
-      color: var(--gold);
-      letter-spacing: 0.04em;
-    }
-    .login-sub {
-      text-align: center;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
-      margin-bottom: 40px;
-    }
-    .form-group { margin-bottom: 20px; }
-    .form-group label {
-      display: block;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 8px;
-    }
-    .form-group input {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--line);
-      color: var(--text);
-      padding: 14px 16px;
-      font-size: 14px;
-      transition: border-color 0.2s;
-    }
-    .form-group input:focus {
-      outline: none;
-      border-color: var(--gold);
-    }
-    .btn {
-      padding: 14px 28px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 0.18em; text-transform: uppercase;
-      transition: all 0.2s;
-      cursor: pointer;
-      border: none;
-      width: 100%;
-    }
-    .btn-gold {
-      background: var(--gold);
+        productsLoading = false;
       color: #000;
     }
     .btn-gold:hover { background: var(--text); box-shadow: 0 0 30px var(--gold-glow); }
-    .btn-ghost {
-      background: transparent;
+        productsLoading = false;
       color: var(--text-dim);
       border: 1px solid var(--line);
     }
@@ -1259,6 +1250,9 @@
   var pendingImage = null;
   var perfRevelada = false;
   var freteAtualAdmin = 0;
+  var productsLoaded = false;
+  var productsLoading = false;
+  var productsRenderToken = 0;
 
   // ============================================
   // SENHA
@@ -1298,6 +1292,20 @@
     var primary = await loadVariacoesFromTable('variacoes', productIds);
 
     return { table: 'variacoes', variacoes: primary.available ? primary.variacoes : [] };
+  }
+
+  async function loadVariacoesForProduct(productId) {
+    var result = await loadVariacoesForProducts([productId]);
+    return result.variacoes || [];
+  }
+
+  function applyCategoryLinks(products) {
+    products.forEach(function(p) {
+      if (!p.categorias && p.categoria_id && allCategories.length) {
+        var cat = allCategories.find(function(c) { return String(c.id) === String(p.categoria_id); });
+        if (cat) p.categorias = cat;
+      }
+    });
   }
 
   async function persistVariacoes(table, removedIds, currentVariacoes, prodId) {
@@ -1362,9 +1370,8 @@
   async function loadAll() {
     // Carrega categorias antes dos produtos para que o relacionamento/filtros funcionem corretamente.
     await loadCategories();
-    await Promise.all([loadOrders(), loadProducts(), loadClients()]);
+    await Promise.all([loadOrders(), loadClients()]);
     renderStats();
-    renderProducts();
   }
 
   async function loadOrders() {
@@ -1391,73 +1398,59 @@
   }
 
   async function loadProducts() {
+    if (productsLoaded || productsLoading) return;
+    productsLoading = true;
     try {
-      // FIX 2026-05-06-B: O .order('nome') no banco estava estourando timeout (8s) com 500+ produtos
-      // sem índice na coluna nome. Solução: trazer sem ordem e ordenar no JS (instantâneo).
-      // Também removido JOIN com categorias (PGRST201 ambíguo) - merge feito no JS abaixo.
+      // Carregamento progressivo por id para evitar OFFSET caro e abrir a tela rápido.
       var COLS = 'id,nome,codigo,codigo_barras,marca,descricao,preco,preco_pix,categoria_id,subcategoria,estoque,ativo,destaque,imagem_url,criado_em';
       var CHUNK_SIZE = 200;
-      var MAX_ROWS = 600;
-      var all = [];
 
-      for (var offset = 0; offset < MAX_ROWS; offset += CHUNK_SIZE) {
-        var to = Math.min(offset + CHUNK_SIZE - 1, MAX_ROWS - 1);
-        var res = await sb.from('produtos').select(COLS).range(offset, to);
-        if (res.error) {
-          console.warn('Erro ao carregar produtos:', res.error);
-          throw res.error;
-        }
-
-        var chunk = res.data || [];
-        all = all.concat(chunk);
-        if (chunk.length < CHUNK_SIZE) break;
+      var firstRes = await sb.from('produtos').select(COLS).order('id', { ascending: false }).limit(CHUNK_SIZE);
+      if (firstRes.error) {
+        console.warn('Erro ao carregar produtos:', firstRes.error);
+        throw firstRes.error;
       }
 
-      allProducts = all;
-
-      // Ordena por nome no JS (instantâneo, sem custo de banco)
-      allProducts.sort(function(a, b) {
-        var na = (a.nome || '').toLowerCase();
-        var nb = (b.nome || '').toLowerCase();
-        if (na < nb) return -1;
-        if (na > nb) return 1;
-        return 0;
-      });
-
-      // Garante que cada produto tenha o objeto categorias, mesmo quando veio pelo fallback.
-      allProducts.forEach(function(p) {
-        if (!p.categorias && p.categoria_id && allCategories.length) {
-          var cat = allCategories.find(function(c) { return String(c.id) === String(p.categoria_id); });
-          if (cat) p.categorias = cat;
-        }
-      });
-
-      // Buscar todas as variações de uma vez. Se a tabela ainda não existir, não trava o catálogo.
-      var ids = allProducts.map(function(p) { return p.id; });
-      if (ids.length) {
-        var resV = await sb.from('variacoes').select('*').in('produto_id', ids);
-        if (resV.error) {
-          console.warn('Erro ao carregar variações:', resV.error);
-        }
-        var todasVars = resV.data || [];
-        todasVars.sort(function(a, b) {
-          var ordemA = Number(a.ordem || 0);
-          var ordemB = Number(b.ordem || 0);
-          if (ordemA !== ordemB) return ordemA - ordemB;
-          return Number(a.id || 0) - Number(b.id || 0);
-        });
-        allProducts.forEach(function(p) {
-          p._variacoes = todasVars.filter(function(v) { return String(v.produto_id) === String(p.id); });
-        });
-      }
-
-      console.log('Produtos carregados:', allProducts);
+      allProducts = (firstRes.data || []).slice();
+      applyCategoryLinks(allProducts);
+      productsLoaded = true;
       renderProducts();
+
+      var lastId = allProducts.length ? allProducts[allProducts.length - 1].id : null;
+
+      (async function continueLoading() {
+        try {
+          while (lastId !== null) {
+            var res = await sb.from('produtos').select(COLS).lt('id', lastId).order('id', { ascending: false }).limit(CHUNK_SIZE);
+            if (res.error) {
+              console.warn('Erro ao carregar produtos:', res.error);
+              break;
+            }
+
+            var chunk = res.data || [];
+            if (!chunk.length) break;
+
+            allProducts = allProducts.concat(chunk);
+            applyCategoryLinks(allProducts);
+            renderProducts();
+
+            lastId = chunk[chunk.length - 1].id;
+            if (chunk.length < CHUNK_SIZE) break;
+          }
+
+          console.log('Produtos carregados:', allProducts);
+        } finally {
+          productsLoading = false;
+        }
+      })();
+
+      return;
     } catch (e) {
       console.error('Erro ao carregar produtos:', e);
       allProducts = [];
       renderProducts();
       showToast('Erro ao carregar produtos: ' + (e.message || e), true);
+      productsLoading = false;
     }
   }
 
@@ -1535,6 +1528,17 @@
       c.style.display = 'none';
     });
     document.getElementById('tab-' + tab).style.display = 'block';
+    if (tab === 'produtos') {
+      if (!productsLoaded && !productsLoading) {
+        var prodBody = document.getElementById('prodBody');
+        if (prodBody) {
+          prodBody.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Carregando produtos...</h4></td></tr>';
+        }
+        loadProducts();
+      } else {
+        renderProducts();
+      }
+    }
     if (tab === 'performance') {
       carregarVisitas();
       carregarComparativo();
@@ -1724,6 +1728,7 @@
   }
 
   function onProdCatFilter() {
+    if (!productsLoaded) return;
     currentCatFilter = document.getElementById('prodCatFilter') ? document.getElementById('prodCatFilter').value : '';
     var subSel = document.getElementById('prodSubFilter');
     subSel.innerHTML = '<option value="">TODAS SUBCATEGORIAS</option>';
@@ -1757,6 +1762,50 @@
     return null;
   }
 
+  function renderProductRow(p) {
+    var varStr = '';
+    var vars = p._variacoes || [];
+    if (vars.length) {
+      var semEstoque = vars.filter(function(v) { return v.estoque <= 0; }).length;
+      var cor = 'var(--green)';
+      if (semEstoque === vars.length) {
+        cor = 'var(--red)';
+      } else if (semEstoque > 0) {
+        cor = 'var(--orange)';
+      }
+      varStr = '<span class="dim" style="color:' + cor + '">⊞ ' + vars.length + ' variações' + (semEstoque > 0 ? ' · ' + semEstoque + ' esgotada(s)' : '') + '</span>';
+    }
+
+    return '<tr>' +
+      '<td>' +
+        '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'nome\',this.textContent)" style="outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'" title="Clique para editar">' + p.nome + '</div>' +
+        (p.codigo ? '<span class="dim">COD: ' + p.codigo + '</span>' : '') +
+        (p.subcategoria ? '<span class="dim" style="color:var(--text-faint)">▸ ' + p.subcategoria + '</span>' : '') +
+        varStr +
+      '</td>' +
+      '<td>' +
+        '<select onchange="salvarCategoria(' + p.id + ',this.value)" style="background:var(--bg-soft);border:1px solid transparent;color:var(--text);padding:3px 6px;font-size:11px;" onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'transparent\'">' +
+          allCategories.map(function(c) {
+            return '<option value="' + c.id + '"' + (String(p.categoria_id) === String(c.id) ? ' selected' : '') + '>' + c.nome + '</option>';
+          }).join('') +
+        '</select>' +
+      '</td>' +
+      '<td>' +
+        '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'preco\',this.textContent)" style="color:var(--gold);font-weight:600;outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'">' + Number(p.preco || 0).toFixed(2) + '</div>' +
+        (p.preco_pix ? '<span class="dim">PIX: ' + fmt(p.preco_pix) + '</span>' : '') +
+      '</td>' +
+      '<td>' +
+        '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'estoque\',this.textContent)" style="' + ((!p.estoque || p.estoque <= 0) ? 'color:var(--red)' : '') + ';outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'">' + (p.estoque || 0) + '</div>' +
+      '</td>' +
+      '<td><span class="' + (p.ativo ? 'ativo-yes' : 'ativo-no') + ' mono" onclick="toggleAtivo(' + p.id + ',' + p.ativo + ')" style="cursor:pointer;">' + (p.ativo ? '● ATIVO' : '○ INATIVO') + '</span></td>' +
+      '<td><span style="color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="editProd(' + p.id + ')">EDITAR →</span></td>' +
+      '<td style="display:flex;gap:6px;align-items:center;">' +
+        '<button onclick="copiarLinkProd(event,' + p.id + ')" style="background:none;border:1px solid var(--line);color:var(--text-faint);padding:3px 7px;font-size:10px;cursor:pointer;" title="Copiar link">🔗</button>' +
+        '<button onclick="duplicarProd(' + p.id + ')" style="background:none;border:1px solid var(--line);color:var(--gold);padding:3px 7px;font-size:10px;cursor:pointer;font-family:\'JetBrains Mono\',monospace;letter-spacing:0.08em;" title="Duplicar produto">⊕ DUP</button>' +
+      '</td>' +
+      '</tr>';
+  }
+
   function renderProducts() {
     var search = (document.getElementById('prodSearch') ? document.getElementById('prodSearch').value : '').toLowerCase().trim();
     var catF = document.getElementById('prodCatFilter') ? document.getElementById('prodCatFilter').value : '';
@@ -1781,45 +1830,31 @@
       body.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Nenhum produto</h4></td></tr>';
       return;
     }
+    var token = ++productsRenderToken;
+    body.innerHTML = '';
 
-    body.innerHTML = list.map(function(p) {
-      var catAtual = getCategoriaProduto(p);
-      var varStr = '';
-      var vars = p._variacoes || [];
-      if (vars.length) {
-        var semEstoque = vars.filter(function(v) { return v.estoque <= 0; }).length;
-        var cor = semEstoque === vars.length ? 'var(--red)' : semEstoque > 0 ? 'var(--orange)' : 'var(--green)';
-        varStr = '<span class="dim" style="color:' + cor + '">⊞ ' + vars.length + ' variações' + (semEstoque > 0 ? ' · ' + semEstoque + ' esgotada(s)' : '') + '</span>';
+    var batchSize = 40;
+    var index = 0;
+
+    function pump() {
+      if (token !== productsRenderToken) return;
+
+      var end = Math.min(index + batchSize, list.length);
+      var html = '';
+      for (; index < end; index++) {
+        html += renderProductRow(list[index]);
       }
-      return '<tr>' +
-        '<td>' +
-          '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'nome\',this.textContent)" style="outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'" title="Clique para editar">' + p.nome + '</div>' +
-          (p.codigo ? '<span class="dim">COD: ' + p.codigo + '</span>' : '') +
-          (p.subcategoria ? '<span class="dim" style="color:var(--text-faint)">▸ ' + p.subcategoria + '</span>' : '') +
-          varStr +
-        '</td>' +
-        '<td>' +
-          '<select onchange="salvarCategoria(' + p.id + ',this.value)" style="background:var(--bg-soft);border:1px solid transparent;color:var(--text);padding:3px 6px;font-size:11px;" onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'transparent\'">' +
-            allCategories.map(function(c) {
-              return '<option value="' + c.id + '"' + (String(p.categoria_id) === String(c.id) ? ' selected' : '') + '>' + c.nome + '</option>';
-            }).join('') +
-          '</select>' +
-        '</td>' +
-        '<td>' +
-          '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'preco\',this.textContent)" style="color:var(--gold);font-weight:600;outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'">' + Number(p.preco || 0).toFixed(2) + '</div>' +
-          (p.preco_pix ? '<span class="dim">PIX: ' + fmt(p.preco_pix) + '</span>' : '') +
-        '</td>' +
-        '<td>' +
-          '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'estoque\',this.textContent)" style="' + ((!p.estoque || p.estoque <= 0) ? 'color:var(--red)' : '') + ';outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'">' + (p.estoque || 0) + '</div>' +
-        '</td>' +
-        '<td><span class="' + (p.ativo ? 'ativo-yes' : 'ativo-no') + ' mono" onclick="toggleAtivo(' + p.id + ',' + p.ativo + ')" style="cursor:pointer;">' + (p.ativo ? '● ATIVO' : '○ INATIVO') + '</span></td>' +
-        '<td><span style="color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="editProd(' + p.id + ')">EDITAR →</span></td>' +
-        '<td style="display:flex;gap:6px;align-items:center;">' +
-          '<button onclick="copiarLinkProd(event,' + p.id + ')" style="background:none;border:1px solid var(--line);color:var(--text-faint);padding:3px 7px;font-size:10px;cursor:pointer;" title="Copiar link">🔗</button>' +
-          '<button onclick="duplicarProd(' + p.id + ')" style="background:none;border:1px solid var(--line);color:var(--gold);padding:3px 7px;font-size:10px;cursor:pointer;font-family:\'JetBrains Mono\',monospace;letter-spacing:0.08em;" title="Duplicar produto">⊕ DUP</button>' +
-        '</td>' +
-        '</tr>';
-    }).join('');
+
+      if (html) {
+        body.insertAdjacentHTML('beforeend', html);
+      }
+
+      if (index < list.length) {
+        requestAnimationFrame(pump);
+      }
+    }
+
+    requestAnimationFrame(pump);
   }
 
   async function salvarInline(id, campo, valor) {
@@ -1853,17 +1888,23 @@
     toast('Produto ' + (!ativo ? 'ativado' : 'desativado'), 'green');
   }
 
+  function getPublicSiteURL() {
+    // Sempre usa alphagalerie.com
+    return 'https://alphagalerie.com';
+  }
+
   function copiarLinkProd(event, id) {
     event.stopPropagation();
     var p = allProducts.find(function(x) { return x.id === id; });
     var link;
     if (!p) return;
+    var baseUrl = getPublicSiteURL();
     if (p.subcategoria && p.subcategoria.toLowerCase() === 'especial') {
-      link = 'https://alphagalerie.netlify.app/#especial';
+      link = baseUrl + '/#especial';
     } else if (p.subcategoria) {
-      link = 'https://alphagalerie.netlify.app/?cat=' + encodeURIComponent(getCategoriaProduto(p) ? getCategoriaProduto(p).slug : '') + '&sub=' + encodeURIComponent(p.subcategoria);
+      link = baseUrl + '/?cat=' + encodeURIComponent(getCategoriaProduto(p) ? getCategoriaProduto(p).slug : '') + '&sub=' + encodeURIComponent(p.subcategoria);
     } else {
-      link = 'https://alphagalerie.netlify.app/?q=' + encodeURIComponent(p.nome);
+      link = baseUrl + '/?q=' + encodeURIComponent(p.nome);
     }
     navigator.clipboard.writeText(link)
       .then(function() { toast('🔗 Link copiado!', 'green'); })
@@ -1871,13 +1912,15 @@
   }
 
   function copiarLinkFiltroAtual() {
+    if (!productsLoaded) { toast('Carregue os produtos primeiro'); return; }
     var catNome = document.getElementById('prodCatFilter') ? document.getElementById('prodCatFilter').value : '';
     var subNome = document.getElementById('prodSubFilter') ? document.getElementById('prodSubFilter').value : '';
     if (!catNome) { toast('Selecione uma categoria primeiro'); return; }
     var cat = allCategories.find(function(c) { return c.nome === catNome; });
+    var baseUrl = getPublicSiteURL();
     var link = subNome
-      ? 'https://alphagalerie.netlify.app/?cat=' + encodeURIComponent(cat ? cat.slug : catNome) + '&sub=' + encodeURIComponent(subNome)
-      : 'https://alphagalerie.netlify.app/?cat=' + encodeURIComponent(cat ? cat.slug : catNome);
+      ? baseUrl + '/?cat=' + encodeURIComponent(cat ? cat.slug : catNome) + '&sub=' + encodeURIComponent(subNome)
+      : baseUrl + '/?cat=' + encodeURIComponent(cat ? cat.slug : catNome);
     navigator.clipboard.writeText(link)
       .then(function() { toast('🔗 Link "' + catNome + (subNome ? ' › ' + subNome : '') + '" copiado!', 'green'); })
       .catch(function() { prompt('Copie:', link); });
@@ -1887,7 +1930,7 @@
   // ============================================
   // DUPLICAR PRODUTO
   // ============================================
-  function duplicarProd(id) {
+  async function duplicarProd(id) {
     var p = allProducts.find(function(x) { return x.id === id; });
     if (!p) return;
 
@@ -1916,7 +1959,9 @@
     }
 
     // Copiar variações do original
-    variacoes = (p._variacoes || []).map(function(v) {
+    var variacoesOriginais = p._variacoes || await loadVariacoesForProduct(p.id);
+    p._variacoes = variacoesOriginais;
+    variacoes = variacoesOriginais.map(function(v) {
       return { id: null, nome: v.nome, preco: v.preco, estoque: v.estoque, ativo: v.ativo };
       // id: null → serão inseridas como novas, não atualizadas
     });
@@ -1955,6 +2000,7 @@
   };
 
   function atualizarSubcats() {
+    if (!allCategories.length) return;
     var catId = document.getElementById('pCategoria') ? document.getElementById('pCategoria').value : '';
     var cat = allCategories.find(function(c) { return c.id === parseInt(catId); });
     var sel = document.getElementById('pSubcategoriaSelect');
@@ -1984,9 +2030,22 @@
     document.getElementById('pSubcategoria').value = '';
     clearImage();
     document.getElementById('prodModal').classList.add('open');
+    if (!productsLoaded && !productsLoading) {
+      loadProducts().then(function() {
+        atualizarSubcats();
+      });
+    } else {
+      atualizarSubcats();
+    }
   }
 
-  function editProd(id) {
+  async function editProd(id) {
+    if (!productsLoaded && !productsLoading) {
+      loadProducts().then(function() {
+        editProd(id);
+      });
+      return;
+    }
     var p = allProducts.find(function(x) { return x.id === id; });
     if (!p) return;
     document.getElementById('prodModalTitle').innerHTML = 'Editar <em>produto</em>';
@@ -2010,8 +2069,10 @@
       subSel.value = [...subSel.options].find(function(o) { return o.value === p.subcategoria; }) ? p.subcategoria : '';
     }
 
-    // Variações vêm do banco (_variacoes), não do campo JSON legado
-    variacoes = (p._variacoes || []).map(function(v) {
+    // Variações são buscadas sob demanda para não travar o catálogo ao abrir.
+    var variacoesProduto = p._variacoes || await loadVariacoesForProduct(p.id);
+    p._variacoes = variacoesProduto;
+    variacoes = variacoesProduto.map(function(v) {
       return { id: v.id, nome: v.nome, preco: v.preco, estoque: v.estoque, ativo: v.ativo };
     });
     variacoesRemovidas = [];
@@ -2034,6 +2095,9 @@
 
   async function saveProd(e) {
     e.preventDefault();
+    if (!productsLoaded && !productsLoading) {
+      await loadProducts();
+    }
     var id = document.getElementById('pId').value;
     var catVal = document.getElementById('pCategoria').value;
     if (!catVal) { showToast('Selecione uma categoria', true); return; }
