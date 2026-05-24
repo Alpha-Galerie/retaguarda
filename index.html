@@ -2165,16 +2165,15 @@
   function copiarLinkProd(event, id) {
     event.stopPropagation();
     var p = allProducts.find(function(x) { return x.id === id; });
-    var link;
     if (!p) return;
     var baseUrl = getPublicSiteURL();
-    if (p.subcategoria && p.subcategoria.toLowerCase() === 'especial') {
-      link = baseUrl + '/#especial';
-    } else if (p.subcategoria) {
-      link = baseUrl + '/?cat=' + encodeURIComponent(getCategoriaProduto(p) ? getCategoriaProduto(p).slug : '') + '&sub=' + encodeURIComponent(p.subcategoria);
-    } else {
-      link = baseUrl + '/?q=' + encodeURIComponent(p.nome);
-    }
+    // Gerar slug do produto (mesmo formato do frontend)
+    var slug = p.nome
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    var link = baseUrl + '/produto/' + p.id + (slug ? '-' + slug : '');
     navigator.clipboard.writeText(link)
       .then(function() { toast('🔗 Link copiado!', 'green'); })
       .catch(function() { prompt('Copie:', link); });
