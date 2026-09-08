@@ -1510,9 +1510,12 @@
 
         <!-- CUPONS -->
         <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
-          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:16px;">🏷 CUPONS DE DESCONTO</div>
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">🏷 CUPONS DE DESCONTO</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-bottom:16px;line-height:1.5;">
+            Estes cupons valem no checkout da loja. Criar, desligar ou excluir aqui tem efeito imediato para o cliente.
+          </div>
           <div id="cuponsLista" style="margin-bottom:16px;"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
             <div>
               <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">CÓDIGO</label>
               <input id="novoCupomCodigo" placeholder="ALPHA20" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:9px;font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" />
@@ -1528,6 +1531,10 @@
             <div>
               <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">VALOR</label>
               <input id="novoCupomValor" type="number" placeholder="10" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:9px;font-family:'JetBrains Mono',monospace;font-size:12px;" />
+            </div>
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">VALIDADE (OPCIONAL)</label>
+              <input id="novoCupomValidade" type="date" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:9px;font-family:'JetBrains Mono',monospace;font-size:12px;" />
             </div>
             <button onclick="adicionarCupom()" style="background:var(--gold);color:#000;border:none;padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">+ ADICIONAR</button>
           </div>
@@ -2436,7 +2443,7 @@
       renderClients();
     }
     if (tab === 'configuracoes') {
-      renderCupons();
+      carregarCupons();
       renderFuncionarios();
     }
   }
@@ -5011,56 +5018,114 @@
   // ============================================
   // CONFIGURAÇÕES
   // ============================================
-  function getCupons() {
-    try { return JSON.parse(localStorage.getItem('ag_cupons')) || getDefCupons(); }
-    catch(e) { return getDefCupons(); }
+  // ============================================
+  // CUPONS
+  // --------------------------------------------
+  // Antes ficavam em localStorage — só no navegador do admin. A loja tinha
+  // a própria lista fixa no código, então cupom criado aqui nunca existiu
+  // para o cliente. Agora ficam na tabela `cupons`, que a loja consulta
+  // pela função validar_cupom().
+  // ============================================
+  var cuponsCache = [];
+
+  async function carregarCupons() {
+    var res = await sb.from('cupons').select('*').order('criado_em', { ascending: false });
+    if (res.error) {
+      console.warn('Erro ao carregar cupons:', res.error.message);
+      avisarSeSemPermissao(res.error, 'cupons');
+      cuponsCache = [];
+    } else {
+      cuponsCache = res.data || [];
+    }
+    renderCupons();
   }
-  function getDefCupons() {
-    return [
-      { codigo: 'ALPHA10', tipo: 'pct', valor: 10, descricao: '10% de desconto' },
-      { codigo: 'ALPHA15', tipo: 'pct', valor: 15, descricao: '15% de desconto' },
-      { codigo: 'VIP20', tipo: 'pct', valor: 20, descricao: '20% VIP' },
-      { codigo: 'BEMVINDO', tipo: 'fixo', valor: 15, descricao: 'R$ 15 OFF' },
-      { codigo: 'FRETEGRATIS', tipo: 'frete', valor: 0, descricao: 'Frete grátis' },
-    ];
+
+  function descricaoCupom(tipo, valor) {
+    if (tipo === 'frete') return 'Frete grátis';
+    if (tipo === 'fixo') return fmt(valor) + ' de desconto';
+    return num(valor) + '% de desconto';
   }
-  function saveCupons(c) { localStorage.setItem('ag_cupons', JSON.stringify(c)); }
+
+  function cupomExpirado(c) {
+    if (c.validade && new Date(c.validade + 'T23:59:59') < new Date()) return true;
+    if (c.limite_usos !== null && c.limite_usos !== undefined && c.usos >= c.limite_usos) return true;
+    return false;
+  }
 
   function renderCupons() {
     var el = document.getElementById('cuponsLista');
     if (!el) return;
-    var cupons = getCupons();
-    if (!cupons.length) { el.innerHTML = '<div style="color:var(--text-faint);font-size:11px;">Nenhum cupom</div>'; return; }
-    el.innerHTML = cupons.map(function(c, i) {
-      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);">' +
-        '<span style="font-family:JetBrains Mono,monospace;color:var(--gold);min-width:120px;">' + c.codigo + '</span>' +
-        '<span style="flex:1;font-size:11px;color:var(--text-faint);">' + c.descricao + '</span>' +
-        '<button onclick="removerCupom(' + i + ')" style="color:var(--red);font-size:16px;cursor:pointer;background:none;border:none;">×</button>' +
+    if (!cuponsCache.length) {
+      el.innerHTML = '<div style="color:var(--text-faint);font-size:11px;">Nenhum cupom cadastrado</div>';
+      return;
+    }
+    el.innerHTML = cuponsCache.map(function(c) {
+      var expirado = cupomExpirado(c);
+      var inativo = !c.ativo || expirado;
+      var motivo = !c.ativo ? 'desligado' : (expirado ? 'expirado' : '');
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;' +
+          (inativo ? 'opacity:0.45;' : '') + '">' +
+        '<span style="font-family:JetBrains Mono,monospace;color:var(--gold);min-width:110px;">' + esc(c.codigo) + '</span>' +
+        '<span style="flex:1;min-width:120px;font-size:11px;color:var(--text-faint);">' + esc(c.descricao || descricaoCupom(c.tipo, c.valor)) +
+          (c.validade ? ' · até ' + new Date(c.validade + 'T12:00:00').toLocaleDateString('pt-BR') : '') +
+          (c.limite_usos ? ' · ' + c.usos + '/' + c.limite_usos + ' usos' : (c.usos ? ' · ' + c.usos + ' usos' : '')) +
+          (motivo ? ' · ' + motivo : '') +
+        '</span>' +
+        '<button class="btn-mini" onclick="alternarCupom(' + c.id + ')">' + (c.ativo ? 'DESLIGAR' : 'LIGAR') + '</button>' +
+        '<button onclick="removerCupom(' + c.id + ')" title="Excluir" style="color:var(--red);font-size:16px;cursor:pointer;background:none;border:none;">×</button>' +
         '</div>';
     }).join('');
   }
 
-  function adicionarCupom() {
+  async function adicionarCupom() {
     var cod = document.getElementById('novoCupomCodigo').value.trim().toUpperCase();
     var tipo = document.getElementById('novoCupomTipo').value;
-    var val = parseFloat(document.getElementById('novoCupomValor').value) || 0;
+    var val = num(document.getElementById('novoCupomValor').value);
+    var validadeEl = document.getElementById('novoCupomValidade');
+    var validade = validadeEl && validadeEl.value ? validadeEl.value : null;
+
     if (!cod) { toast('Digite o código'); return; }
-    var c = getCupons();
-    if (c.find(function(x) { return x.codigo === cod; })) { toast('Já existe'); return; }
-    var descs = { pct: val + '% OFF', fixo: 'R$ ' + val + ' OFF', frete: 'Frete grátis' };
-    c.push({ codigo: cod, tipo: tipo, valor: val, descricao: descs[tipo] });
-    saveCupons(c);
-    renderCupons();
-    document.getElementById('novoCupomCodigo').value = '';
-    document.getElementById('novoCupomValor').value = '';
-    toast('Cupom ' + cod + ' criado', 'green');
+    if (tipo !== 'frete' && val <= 0) { toast('Informe o valor do desconto'); return; }
+    if (tipo === 'pct' && val > 100) { toast('Percentual não pode passar de 100'); return; }
+
+    try {
+      var res = await sb.from('cupons').insert({
+        codigo: cod, tipo: tipo, valor: tipo === 'frete' ? 0 : val,
+        descricao: descricaoCupom(tipo, val), ativo: true, validade: validade
+      }).select().single();
+      if (res.error) {
+        if (String(res.error.message || '').indexOf('duplicate') >= 0 || res.error.code === '23505') {
+          toast('Já existe um cupom com esse código');
+        } else { throw res.error; }
+        return;
+      }
+      document.getElementById('novoCupomCodigo').value = '';
+      document.getElementById('novoCupomValor').value = '';
+      if (validadeEl) validadeEl.value = '';
+      await carregarCupons();
+      toast('Cupom ' + cod + ' criado e já valendo na loja', 'green');
+    } catch (e) {
+      console.error(e);
+      showToast('Erro ao criar cupom: ' + (e.message || e), true);
+    }
   }
 
-  function removerCupom(i) {
-    var c = getCupons();
-    c.splice(i, 1);
-    saveCupons(c);
-    renderCupons();
+  async function alternarCupom(id) {
+    var c = cuponsCache.find(function(x) { return x.id === id; });
+    if (!c) return;
+    var upd = await sb.from('cupons').update({ ativo: !c.ativo }).eq('id', id);
+    if (upd.error) { showToast('Erro: ' + upd.error.message, true); return; }
+    await carregarCupons();
+    toast(c.codigo + (c.ativo ? ' desligado' : ' ligado'), c.ativo ? null : 'green');
+  }
+
+  async function removerCupom(id) {
+    var c = cuponsCache.find(function(x) { return x.id === id; });
+    if (!c) return;
+    if (!confirm('Excluir o cupom "' + c.codigo + '"?\n\nEle deixa de funcionar na loja imediatamente.')) return;
+    var del = await sb.from('cupons').delete().eq('id', id);
+    if (del.error) { showToast('Erro: ' + del.error.message, true); return; }
+    await carregarCupons();
     toast('Cupom removido');
   }
 
