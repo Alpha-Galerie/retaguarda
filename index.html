@@ -1330,6 +1330,24 @@
           </div>
         </div>
 
+        <!-- ITENS VENDIDOS SEM CADASTRO (RECONCILIAÇÃO) -->
+        <div class="panel" id="orfaosPanel" style="display:none;">
+          <div class="panel-title">
+            <span>Itens vendidos <em>sem cadastro</em></span>
+            <span style="display:flex;gap:6px;align-items:center;">
+              <span class="mono" style="color:var(--text-faint);" id="orfaosResumo"></span>
+              <button class="btn-mini" onclick="alternarIgnorados()" id="btnVerIgnorados">VER IGNORADOS</button>
+            </span>
+          </div>
+          <div style="font-size:11px;color:var(--text-faint);line-height:1.6;margin-bottom:16px;">
+            Produtos que aparecem em pedidos mas não existem no catálogo — normalmente vendas do PDV
+            digitadas na mão, ou itens renomeados/excluídos depois da venda. Enquanto estiverem aqui,
+            a receita deles fica em "Sem categoria". Vincular a um produto do catálogo (ou cadastrar)
+            corrige o histórico de uma vez: os pedidos antigos passam a apontar para o produto certo.
+          </div>
+          <div id="orfaosLista"></div>
+        </div>
+
         <div class="filters-bar" style="flex-wrap:wrap;gap:10px;">
           <input type="text" class="search-input" placeholder="Buscar produto por nome, código ou marca..." id="prodSearch" oninput="renderProducts()" style="flex:1;min-width:200px;" />
           <select id="prodCatFilter" onchange="onProdCatFilter()" style="background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;min-width:160px;">
@@ -2669,9 +2687,248 @@
         categorias.slice(0, 8).map(function(t) { return Math.round(t.valor); })
       );
       aplicarBlurLock();
+      try { renderItensOrfaos(); } catch (e) { console.warn(e); }
     } catch (e) {
       console.warn('Erro ao calcular receita por produto/categoria:', e);
     }
+  }
+
+  // ============================================
+  // RECONCILIAÇÃO DE ITENS SEM CADASTRO
+  // --------------------------------------------
+  // Itens de pedidos que não batem com nenhum produto do catálogo. Vincular
+  // grava produto_id nas linhas antigas de pedido_itens, então a correção
+  // vale para todo o histórico e não precisa ser refeita.
+  // ============================================
+  var orfaosCache = [];
+  var mostrandoIgnorados = false;
+
+  function normalizarTexto(t) {
+    return String(t || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function getIgnorados() {
+    try { return JSON.parse(localStorage.getItem('ag_orfaos_ignorados') || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveIgnorados(l) { localStorage.setItem('ag_orfaos_ignorados', JSON.stringify(l)); }
+
+  // Similaridade por palavras inteiras. Uma busca "contém" ingênua casa
+  // "Red Bull" com "ALUMÍNIO PREDATOR" (p-RED-ator), então só conta palavra
+  // completa, com peso maior para as mais longas.
+  function similaridade(a, b) {
+    var pa = normalizarTexto(a).split(' ').filter(function(x) { return x.length > 2; });
+    var pb = normalizarTexto(b).split(' ').filter(function(x) { return x.length > 2; });
+    if (!pa.length || !pb.length) return 0;
+    var peso = 0, total = 0;
+    pa.forEach(function(w) {
+      total += w.length;
+      if (pb.indexOf(w) >= 0) peso += w.length;
+    });
+    return total ? peso / total : 0;
+  }
+
+  function sugerirProduto(nome) {
+    var melhor = null, melhorNota = 0;
+    (allProducts || []).forEach(function(p) {
+      var nota = similaridade(nome, p.nome);
+      if (nota > melhorNota) { melhorNota = nota; melhor = p; }
+    });
+    // Abaixo de 60% de palavras em comum a sugestão erra mais do que ajuda.
+    return melhorNota >= 0.6 ? melhor : null;
+  }
+
+  function calcularItensOrfaos() {
+    montarIndiceProdutos();
+    var mapa = {};
+    (allOrders || []).forEach(function(o) {
+      if (!STATUS_FATURADO.includes(o.status)) return;
+      (getItensDoPedidoAdmin(o) || []).forEach(function(i) {
+        if (produtoDoItem(i)) return;               // já resolve pelo catálogo
+        var nome = i.produto_nome || i.nome;
+        if (!nome) return;
+        var qtd = Number(i.quantidade || i.qtd || 1) || 1;
+        if (!mapa[nome]) mapa[nome] = { nome: nome, unidades: 0, receita: 0, pedidos: 0, ultima: null, preco: 0 };
+        var m = mapa[nome];
+        m.unidades += qtd;
+        m.receita += num(i.subtotal || ((i.preco_unitario || i.preco || 0) * qtd));
+        m.pedidos += 1;
+        m.preco = Math.max(m.preco, num(i.preco_unitario || i.preco));
+        if (!m.ultima || o.criado_em > m.ultima) m.ultima = o.criado_em;
+      });
+    });
+    orfaosCache = Object.keys(mapa).map(function(k) { return mapa[k]; })
+      .sort(function(a, b) { return b.receita - a.receita; });
+    return orfaosCache;
+  }
+
+  function renderItensOrfaos() {
+    var painel = document.getElementById('orfaosPanel');
+    if (!painel) return;
+    if (!productsLoaded) { painel.style.display = 'none'; return; }
+
+    calcularItensOrfaos();
+    var ignorados = getIgnorados();
+    var visiveis = orfaosCache.filter(function(o) {
+      return mostrandoIgnorados ? ignorados.indexOf(o.nome) >= 0 : ignorados.indexOf(o.nome) < 0;
+    });
+
+    var pendentes = orfaosCache.filter(function(o) { return ignorados.indexOf(o.nome) < 0; });
+    var receitaPendente = pendentes.reduce(function(s, o) { return s + o.receita; }, 0);
+
+    if (!orfaosCache.length) { painel.style.display = 'none'; return; }
+    painel.style.display = '';
+
+    setText('orfaosResumo', pendentes.length + ' a resolver · ' + fmt(receitaPendente) + ' sem categoria');
+    var btn = document.getElementById('btnVerIgnorados');
+    if (btn) btn.textContent = mostrandoIgnorados
+      ? '← VOLTAR AOS PENDENTES'
+      : 'VER IGNORADOS (' + ignorados.length + ')';
+
+    if (!visiveis.length) {
+      setHTML('orfaosLista', '<div style="color:var(--green);font-size:12px;padding:8px 0;">' +
+        (mostrandoIgnorados ? 'Nenhum item ignorado.' : '✓ Tudo reconciliado — toda a receita está classificada.') + '</div>');
+      return;
+    }
+
+    setHTML('orfaosLista', visiveis.map(function(o, idx) {
+      var sugestao = mostrandoIgnorados ? null : sugerirProduto(o.nome);
+      var id = 'orf' + idx;
+      return '<div class="hist-row" style="align-items:flex-start;gap:10px;" data-orfao="' + esc(o.nome) + '">' +
+        '<div class="hist-main" style="min-width:200px;">' +
+          '<strong>' + esc(o.nome) + '</strong>' +
+          '<small>' + o.unidades + ' un · ' + o.pedidos + ' pedidos · ' + fmt(o.receita) +
+            ' · última venda ' + (o.ultima ? new Date(o.ultima).toLocaleDateString('pt-BR') : '—') + '</small>' +
+          (sugestao ? '<small style="color:var(--gold);">parece ser: ' + esc(sugestao.nome) + '</small>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
+          (mostrandoIgnorados
+            ? '<button class="btn-mini" onclick="designorarOrfao(\'' + esc(o.nome).replace(/'/g, "\\'") + '\')">REATIVAR</button>'
+            : (sugestao ? '<button class="btn-mini gold" onclick="vincularOrfao(\'' + esc(o.nome).replace(/'/g, "\\'") + '\',' + sugestao.id + ')">VINCULAR A ' + esc(sugestao.nome).toUpperCase().slice(0, 22) + '</button>' : '') +
+              '<button class="btn-mini" onclick="abrirBuscaVinculo(\'' + esc(o.nome).replace(/'/g, "\\'") + '\',\'' + id + '\')">ESCOLHER OUTRO</button>' +
+              '<button class="btn-mini" onclick="criarProdutoDoOrfao(\'' + esc(o.nome).replace(/'/g, "\\'") + '\')">CADASTRAR</button>' +
+              '<button class="btn-mini" onclick="ignorarOrfao(\'' + esc(o.nome).replace(/'/g, "\\'") + '\')">IGNORAR</button>') +
+        '</div>' +
+        '<div id="busca_' + id + '" style="display:none;width:100%;margin-top:8px;">' +
+          '<input type="text" class="search-input" placeholder="Buscar produto do catálogo..." ' +
+            'oninput="renderBuscaVinculo(\'' + esc(o.nome).replace(/'/g, "\\'") + '\',\'' + id + '\',this.value)" style="width:100%;max-width:none;" />' +
+          '<div class="prod-pick" id="pick_' + id + '"></div>' +
+        '</div>' +
+        '</div>';
+    }).join(''));
+  }
+
+  function abrirBuscaVinculo(nome, id) {
+    var box = document.getElementById('busca_' + id);
+    if (!box) return;
+    var abrir = box.style.display === 'none';
+    box.style.display = abrir ? 'block' : 'none';
+    if (abrir) {
+      renderBuscaVinculo(nome, id, '');
+      var inp = box.querySelector('input');
+      if (inp) inp.focus();
+    }
+  }
+
+  function renderBuscaVinculo(nome, id, termo) {
+    var pick = document.getElementById('pick_' + id);
+    if (!pick) return;
+    var t = normalizarTexto(termo);
+    var lista = (allProducts || []).filter(function(p) {
+      if (!t) return true;
+      return normalizarTexto(p.nome).indexOf(t) >= 0 || String(p.codigo || '').toLowerCase().indexOf(t) >= 0;
+    }).slice(0, 30);
+    pick.innerHTML = lista.length
+      ? lista.map(function(p) {
+          return '<div class="prod-pick-row" onclick="vincularOrfao(\'' + esc(nome).replace(/'/g, "\\'") + '\',' + p.id + ')">' +
+            '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.nome) +
+            '<small style="display:block;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;font-size:9px;">' + esc(p.codigo || '—') + '</small></div>' +
+            '<span class="mono" style="color:var(--gold);">' + fmt(num(p.preco_pix || p.preco)) + '</span></div>';
+        }).join('')
+      : '<div style="padding:12px;font-size:11px;color:var(--text-faint);">Nenhum produto encontrado.</div>';
+  }
+
+  async function vincularOrfao(nome, produtoId) {
+    var p = (allProducts || []).find(function(x) { return String(x.id) === String(produtoId); });
+    if (!p) return;
+    var o = orfaosCache.find(function(x) { return x.nome === nome; });
+    if (!confirm('Vincular "' + nome + '" ao produto "' + p.nome + '"?\n\n' +
+                 (o ? o.pedidos + ' item(ns) de pedidos antigos' : 'Os itens antigos') +
+                 ' passarão a apontar para esse produto.')) return;
+    try {
+      // Só linhas ainda órfãs: nunca sobrescreve um vínculo já existente.
+      var upd = await sb.from('pedido_itens')
+        .update({ produto_id: p.id, produto_codigo: p.codigo || null })
+        .eq('produto_nome', nome)
+        .is('produto_id', null);
+      if (upd.error) throw upd.error;
+
+      // Reflete no estado local para não precisar recarregar tudo.
+      (allOrders || []).forEach(function(ped) {
+        (ped.pedido_itens || []).forEach(function(i) {
+          if (i.produto_nome === nome && !i.produto_id) { i.produto_id = p.id; i.produto_codigo = p.codigo || null; }
+        });
+      });
+      showToast('"' + nome + '" vinculado a ' + p.nome + ' ✓');
+      calcularReceitaPorProdutoCategoria();
+      renderItensOrfaos();
+    } catch (e) {
+      console.error(e);
+      showToast('Erro ao vincular: ' + (e.message || e), true);
+    }
+  }
+
+  async function criarProdutoDoOrfao(nome) {
+    var o = orfaosCache.find(function(x) { return x.nome === nome; });
+    if (!o) return;
+    var opcoes = allCategories.map(function(c, i) { return (i + 1) + ') ' + c.nome; }).join('\n');
+    var escolha = prompt('Cadastrar "' + nome + '" no catálogo.\n\nEm qual categoria?\n' + opcoes, '1');
+    if (escolha === null) return;
+    var cat = allCategories[parseInt(escolha, 10) - 1];
+    if (!cat) { showToast('Categoria inválida', true); return; }
+    var preco = prompt('Preço de venda (R$):', String(o.preco || 0));
+    if (preco === null) return;
+
+    try {
+      var ins = await sb.from('produtos').insert({
+        nome: nome,
+        preco: num(preco),
+        preco_pix: num(preco),
+        categoria_id: cat.id,
+        estoque: 0,
+        ativo: true
+      }).select().single();
+      if (ins.error) throw ins.error;
+
+      allProducts.unshift(ins.data);
+      applyCategoryLinks(allProducts);
+      showToast('"' + nome + '" cadastrado em ' + cat.nome + ' ✓');
+      renderProducts();
+      await vincularOrfao(nome, ins.data.id);
+    } catch (e) {
+      console.error(e);
+      showToast('Erro ao cadastrar: ' + (e.message || e), true);
+    }
+  }
+
+  function ignorarOrfao(nome) {
+    var l = getIgnorados();
+    if (l.indexOf(nome) < 0) l.push(nome);
+    saveIgnorados(l);
+    showToast('"' + nome + '" ignorado');
+    renderItensOrfaos();
+  }
+
+  function designorarOrfao(nome) {
+    saveIgnorados(getIgnorados().filter(function(x) { return x !== nome; }));
+    renderItensOrfaos();
+  }
+
+  function alternarIgnorados() {
+    mostrandoIgnorados = !mostrandoIgnorados;
+    renderItensOrfaos();
   }
 
   // ============================================
