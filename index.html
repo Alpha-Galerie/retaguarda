@@ -1191,6 +1191,33 @@
           </div>
         </div>
 
+        <!-- RELATÓRIO DE CLIENTES -->
+        <div class="panel">
+          <div class="panel-title"><span>Relatório de <em>clientes</em></span>
+            <span style="display:flex;gap:6px;align-items:center;">
+              <span class="mono" style="color:var(--text-faint);" id="relClientesResumo"></span>
+              <button class="btn-mini gold" onclick="exportarRelatorioClientesCSV()">⬇ CSV</button>
+            </span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="mini-table" style="min-width:620px;">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Pedidos<br><span style="font-weight:400;text-transform:none;letter-spacing:0;">no período</span></th>
+                  <th>Gasto no período</th>
+                  <th>Gasto no mês</th>
+                  <th>Total histórico</th>
+                  <th>Último pedido</th>
+                </tr>
+              </thead>
+              <tbody id="relClientesBody">
+                <tr><td colspan="6" style="color:var(--text-faint);font-size:11px;padding:16px 10px;">Calculando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- ÚLTIMOS PEDIDOS -->
         <div class="panel">
           <div class="panel-title"><span>Últimos <em>pedidos</em></span>
@@ -1379,12 +1406,11 @@
           <button class="filter-pill active" data-clifiltro="todos" onclick="filtrarClientes('todos')">Todos</button>
           <button class="filter-pill" data-clifiltro="compradores" onclick="filtrarClientes('compradores')">Com pedidos</button>
           <button class="filter-pill" data-clifiltro="recorrentes" onclick="filtrarClientes('recorrentes')">Recorrentes</button>
-          <button class="filter-pill" data-clifiltro="vip" onclick="filtrarClientes('vip')">VIP</button>
+          <button class="filter-pill" data-clifiltro="vip" onclick="filtrarClientes('vip')">Fiéis (5+)</button>
           <button class="filter-pill" data-clifiltro="inativos" onclick="filtrarClientes('inativos')">Inativos</button>
           <button class="filter-pill" data-clifiltro="sempedido" onclick="filtrarClientes('sempedido')">Sem pedido</button>
           <select id="cliOrdem" onchange="renderClients()" style="background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;">
             <option value="recente">Compra mais recente</option>
-            <option value="gasto">Maior valor gasto</option>
             <option value="pedidos">Mais pedidos</option>
             <option value="nome">Nome (A-Z)</option>
             <option value="cadastro">Cadastro mais recente</option>
@@ -1400,14 +1426,13 @@
                 <th>Cliente</th>
                 <th>Contato</th>
                 <th>Pedidos</th>
-                <th>Total gasto</th>
                 <th>Último pedido</th>
                 <th>Situação</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="cliBody">
-              <tr><td colspan="7" class="empty-table"><h4>Carregando...</h4></td></tr>
+              <tr><td colspan="6" class="empty-table"><h4>Carregando...</h4></td></tr>
             </tbody>
           </table>
         </div>
@@ -1909,6 +1934,8 @@
   var productsLoading = false;
   var productsRenderToken = 0;
   var perfPeriodo = '30';
+  // Status que contam como venda concretizada em todos os relatórios.
+  var STATUS_FATURADO = ['pago', 'enviado', 'entregue'];
   var visitasCache = null;
   var pedidoEdicao = null;
   var cliFiltro = 'todos';
@@ -2211,6 +2238,9 @@
           }
 
           console.log('Produtos carregados:', allProducts);
+          // Com o catálogo completo em memória dá para rebater os itens
+          // vendidos contra os produtos e ratear a receita por categoria.
+          try { calcularReceitaPorProdutoCategoria(); } catch (e) { console.warn(e); }
         } finally {
           productsLoading = false;
         }
@@ -2309,7 +2339,8 @@
   }
 
   function fmt(v) {
-    return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
+    // Com separador de milhar: "R$ 12.082,20" em vez de "R$ 12082,20".
+    return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function fmtDate(d) {
@@ -2369,6 +2400,8 @@
       } else {
         renderProducts();
       }
+      calcularTicketPeriodo();
+      calcularReceitaPorProdutoCategoria();
     }
     if (tab === 'performance') {
       ensureCharts();
@@ -2506,55 +2539,137 @@
   // ============================================
   // RECEITA POR PRODUTO / CATEGORIA
   // ============================================
+  // Índice de produtos para resolver o item de um pedido.
+  // Necessário porque 2 em cada 3 itens vendidos foram gravados SEM
+  // produto_id (vieram do PDV ou de versões antigas do site). Sem o
+  // fallback por código e por nome, a maior parte da receita ficava fora
+  // do rateio por categoria — era isso que deixava "Sem dados" na tela.
+  var indiceProdutos = { porId: {}, porCodigo: {}, porNome: {} };
+
+  function montarIndiceProdutos() {
+    var idx = { porId: {}, porCodigo: {}, porNome: {} };
+    (allProducts || []).forEach(function(p) {
+      idx.porId[String(p.id)] = p;
+      if (p.codigo) idx.porCodigo[String(p.codigo).trim().toLowerCase()] = p;
+      if (p.nome) {
+        var chave = String(p.nome).trim().toLowerCase();
+        if (!idx.porNome[chave]) idx.porNome[chave] = p;
+      }
+    });
+    indiceProdutos = idx;
+  }
+
+  function produtoDoItem(i) {
+    if (!i) return null;
+    if (i.produto_id && indiceProdutos.porId[String(i.produto_id)]) return indiceProdutos.porId[String(i.produto_id)];
+    var cod = i.produto_codigo || i.codigo;
+    if (cod && indiceProdutos.porCodigo[String(cod).trim().toLowerCase()]) return indiceProdutos.porCodigo[String(cod).trim().toLowerCase()];
+    var nome = i.produto_nome || i.nome;
+    if (nome && indiceProdutos.porNome[String(nome).trim().toLowerCase()]) return indiceProdutos.porNome[String(nome).trim().toLowerCase()];
+    return null;
+  }
+
+  function categoriaDoItem(i) {
+    if (i && (i.categoria || i.categoria_nome)) return i.categoria || i.categoria_nome;
+    var p = produtoDoItem(i);
+    if (!p) return null;
+    var cat = getCategoriaProduto(p);
+    return (cat && cat.nome) || p.subcategoria || null;
+  }
+
+  var receitaVerTudo = false;
+
+  function alternarVerTodosProdutos() {
+    receitaVerTudo = !receitaVerTudo;
+    calcularReceitaPorProdutoCategoria();
+  }
+
   function calcularReceitaPorProdutoCategoria() {
     try {
-      var container = document.getElementById('revenueTop');
-      if (!container) return;
-      var paid = ['pago','enviado','entregue'];
-      var prodMap = {};
-      var catMap = {};
+      if (!document.getElementById('revenueTop')) return;
+      montarIndiceProdutos();
 
-      allOrders.forEach(function(o){
-        if (!paid.includes(o.status)) return;
-        var itens = getItensDoPedidoAdmin(o) || [];
-        itens.forEach(function(i){
+      var prodMap = {}, catMap = {}, receitaTotal = 0, unidadesTotal = 0;
+
+      (allOrders || []).forEach(function(o) {
+        if (!STATUS_FATURADO.includes(o.status)) return;
+        (getItensDoPedidoAdmin(o) || []).forEach(function(i) {
           var qtd = Number(i.quantidade || i.qtd || 1) || 1;
-          var subtotal = Number(i.subtotal || ((i.preco_unitario || i.preco) * qtd) || 0) || 0;
-          var name = (i.produto_nome || i.nome || ('Produto ' + (i.produto_id || ''))) ;
-          prodMap[name] = (prodMap[name] || 0) + subtotal;
+          var subtotal = num(i.subtotal || ((i.preco_unitario || i.preco || 0) * qtd));
+          var nome = i.produto_nome || i.nome || ('Produto ' + (i.produto_id || '?'));
 
-          var cat = i.categoria || i.categoria_nome || i.subcategoria || '';
-          if (!cat && i.produto_id) {
-            var p = allProducts.find(function(x){ return String(x.id) === String(i.produto_id); });
-            if (p) {
-              cat = (p.categorias && p.categorias.nome) || p.subcategoria || (getCategoriaProduto(p) ? getCategoriaProduto(p).nome : '');
-            }
-          }
-          if (cat) catMap[cat] = (catMap[cat] || 0) + subtotal;
+          if (!prodMap[nome]) prodMap[nome] = { valor: 0, qtd: 0 };
+          prodMap[nome].valor += subtotal;
+          prodMap[nome].qtd += qtd;
+
+          // Nada é descartado: o que não casa com o catálogo cai em
+          // "Sem categoria" para que a soma feche com o faturamento.
+          var cat = categoriaDoItem(i) || 'Sem categoria';
+          if (!catMap[cat]) catMap[cat] = { valor: 0, qtd: 0 };
+          catMap[cat].valor += subtotal;
+          catMap[cat].qtd += qtd;
+
+          receitaTotal += subtotal;
+          unidadesTotal += qtd;
         });
       });
 
-      var topProds = Object.keys(prodMap).map(function(k){ return {k:k,v:prodMap[k]}; }).sort(function(a,b){ return b.v - a.v; }).slice(0,8);
-      var topCats = Object.keys(catMap).map(function(k){ return {k:k,v:catMap[k]}; }).sort(function(a,b){ return b.v - a.v; }).slice(0,8);
+      var ordenar = function(m) {
+        return Object.keys(m).map(function(k) { return { nome: k, valor: m[k].valor, qtd: m[k].qtd }; })
+          .sort(function(a, b) { return b.valor - a.valor; });
+      };
+      var produtos = ordenar(prodMap);
+      var categorias = ordenar(catMap);
+      var LIMITE = 20;
+      var produtosVisiveis = receitaVerTudo ? produtos : produtos.slice(0, LIMITE);
 
-      var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
-      html += '<div><div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">Top produtos por receita</div>';
-      if (!topProds.length) html += '<div style="color:var(--text-faint);">Sem dados</div>'; else html += '<ol style="padding-left:18px;margin:0;">' + topProds.map(function(t){ return '<li style="margin-bottom:6px;">' + t.k + ' — <strong style="color:var(--gold)">' + fmt(t.v) + '</strong></li>'; }).join('') + '</ol>';
+      var linha = function(t, i, total) {
+        var pct = total ? Math.round((t.valor / total) * 100) : 0;
+        return '<div class="rank-row">' +
+          '<div class="rank-pos">' + (i + 1) + '</div>' +
+          '<div class="rank-name">' + esc(t.nome) +
+            '<small>' + t.qtd + ' un · ' + pct + '% da receita</small></div>' +
+          '<div class="rank-val">' + fmt(t.valor) + '</div></div>';
+      };
+
+      var html = '<div class="panel-grid-2">';
+
+      html += '<div><div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;letter-spacing:0.12em;">' +
+        'PRODUTOS VENDIDOS — ' + produtos.length + ' diferentes</div>';
+      html += produtos.length
+        ? produtosVisiveis.map(function(t, i) { return linha(t, i, receitaTotal); }).join('')
+        : '<div style="color:var(--text-faint);font-size:11px;">Sem vendas registradas</div>';
+      if (produtos.length > LIMITE) {
+        html += '<div style="margin-top:10px;"><button class="btn-mini" onclick="alternarVerTodosProdutos()">' +
+          (receitaVerTudo ? '▲ MOSTRAR SÓ O TOP ' + LIMITE : '▼ VER TODOS OS ' + produtos.length + ' PRODUTOS') +
+          '</button></div>';
+      }
       html += '</div>';
 
-      html += '<div><div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">Top categorias por receita</div>';
-      if (!topCats.length) html += '<div style="color:var(--text-faint);">Sem dados</div>'; else html += '<ol style="padding-left:18px;margin:0;">' + topCats.map(function(t){ return '<li style="margin-bottom:6px;">' + t.k + ' — <strong style="color:var(--gold)">' + fmt(t.v) + '</strong></li>'; }).join('') + '</ol>';
-      html += '</div>';
-      html += '</div>';
+      html += '<div><div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;letter-spacing:0.12em;">' +
+        'CATEGORIAS</div>';
+      html += categorias.length
+        ? categorias.map(function(t, i) { return linha(t, i, receitaTotal); }).join('')
+        : '<div style="color:var(--text-faint);font-size:11px;">Sem vendas registradas</div>';
+      if (catMap['Sem categoria']) {
+        html += '<div style="margin-top:10px;font-size:10px;color:var(--text-faint);line-height:1.5;">' +
+          '"Sem categoria" são itens vendidos que não batem com nenhum produto do catálogo atual ' +
+          '(vendidos pelo PDV como item avulso, ou produtos renomeados/excluídos depois da venda).</div>';
+      }
+      html += '</div></div>';
 
-      var listsEl = document.getElementById('revenueLists');
-      if (listsEl) listsEl.innerHTML = html;
+      html += '<div class="mono" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--text-faint);font-size:10px;">' +
+        'TOTAL FATURADO: <span style="color:var(--gold);">' + fmt(receitaTotal) + '</span> · ' +
+        unidadesTotal + ' unidades · ' + produtos.length + ' produtos diferentes</div>';
 
-      // Atualiza chart de categorias
-      var catLabels = topCats.map(function(t){ return t.k; });
-      var catVals = topCats.map(function(t){ return Math.round(t.v); });
-      try { updateRevenueCategoryChart(catLabels, catVals); } catch(e) { console.warn(e); }
-    } catch(e) {
+      setHTML('revenueLists', html);
+
+      updateRevenueCategoryChart(
+        categorias.slice(0, 8).map(function(t) { return t.nome; }),
+        categorias.slice(0, 8).map(function(t) { return Math.round(t.valor); })
+      );
+      aplicarBlurLock();
+    } catch (e) {
       console.warn('Erro ao calcular receita por produto/categoria:', e);
     }
   }
@@ -3908,10 +4023,13 @@
     renderStatsClientes();
   }
 
+  // Classificação por frequência, nunca por valor: o selo antigo "VIP" era
+  // calculado sobre o total gasto e acabava expondo na lista justamente o
+  // dado financeiro que não deve aparecer ali.
   function classificarCliente(c) {
     if (!c.qtdPedidos) return { cls: 'novo', txt: 'Sem pedido' };
-    if (c.total >= 500) return { cls: 'vip', txt: 'VIP' };
     if (c.diasSemComprar !== null && c.diasSemComprar > 90) return { cls: 'inativo', txt: 'Inativo' };
+    if (c.qtdPedidos >= 5) return { cls: 'vip', txt: 'Fiel' };
     if (c.qtdPedidos >= 2) return { cls: 'rec', txt: 'Recorrente' };
     return { cls: 'novo', txt: 'Novo' };
   }
@@ -3948,7 +4066,7 @@
 
     if (cliFiltro === 'compradores') list = list.filter(function(c) { return c.qtdPedidos > 0; });
     else if (cliFiltro === 'recorrentes') list = list.filter(function(c) { return c.qtdPedidos >= 2; });
-    else if (cliFiltro === 'vip') list = list.filter(function(c) { return c.total >= 500; });
+    else if (cliFiltro === 'vip') list = list.filter(function(c) { return c.qtdPedidos >= 5; });
     else if (cliFiltro === 'inativos') list = list.filter(function(c) { return c.qtdPedidos > 0 && c.diasSemComprar !== null && c.diasSemComprar > 90; });
     else if (cliFiltro === 'sempedido') list = list.filter(function(c) { return c.qtdPedidos === 0; });
 
@@ -3962,7 +4080,6 @@
 
     var ordem = document.getElementById('cliOrdem') ? document.getElementById('cliOrdem').value : 'recente';
     list.sort(function(a, b) {
-      if (ordem === 'gasto') return b.total - a.total;
       if (ordem === 'pedidos') return b.qtdPedidos - a.qtdPedidos;
       if (ordem === 'nome') return (a.nome || '').localeCompare(b.nome || '');
       if (ordem === 'cadastro') return String(b.cadastro || '').localeCompare(String(a.cadastro || ''));
@@ -3979,7 +4096,7 @@
     setText('cliCount', list.length + ' de ' + clientesIndex.length);
 
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="7" class="empty-table"><h4>Nenhum cliente encontrado</h4><p style="font-size:12px;color:var(--text-faint);">A lista é montada a partir dos pedidos e dos cadastros da loja.</p></td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Nenhum cliente encontrado</h4><p style="font-size:12px;color:var(--text-faint);">A lista é montada a partir dos pedidos e dos cadastros da loja.</p></td></tr>';
       return;
     }
 
@@ -3994,7 +4111,6 @@
           '<small>' + (c.cadastrado ? 'Cadastrado na loja' : 'Identificado por pedidos') + '</small></div></td>' +
         '<td><div style="font-size:12px;">' + (c.whatsapp || '—') + '</div><small class="mono" style="color:var(--text-faint);font-size:10px;">' + (c.email || '—') + '</small></td>' +
         '<td><span style="font-family:\'Cormorant Garamond\',serif;font-size:20px;">' + c.qtdPedidos + '</span></td>' +
-        '<td><div class="order-total">' + fmt(c.total) + '</div><small class="mono" style="color:var(--text-faint);font-size:10px;">ticket ' + fmt(c.ticket) + '</small></td>' +
         '<td>' + ultimoTxt + '</td>' +
         '<td><span class="cli-tag ' + tag.cls + '">' + tag.txt + '</span></td>' +
         '<td onclick="event.stopPropagation();">' +
@@ -4077,7 +4193,9 @@
   function exportarClientesCSV() {
     var list = clientesFiltrados();
     if (!list.length) { showToast('Nada para exportar', true); return; }
-    var linhas = [['Nome', 'WhatsApp', 'Email', 'Endereco', 'Pedidos', 'Total gasto', 'Ticket medio', 'Ultimo pedido', 'Cadastro', 'Situacao']];
+    // Lista de contatos, sem valores: os números por cliente ficam no
+    // Relatório de clientes, dentro do painel de Performance.
+    var linhas = [['Nome', 'WhatsApp', 'Email', 'Endereco', 'Pedidos', 'Ultimo pedido', 'Cadastro', 'Situacao']];
     list.forEach(function(c) {
       linhas.push([
         c.nome || '',
@@ -4085,26 +4203,12 @@
         c.email || '',
         c.endereco || '',
         c.qtdPedidos,
-        Number(c.total).toFixed(2),
-        Number(c.ticket).toFixed(2),
         c.ultimo ? new Date(c.ultimo).toLocaleDateString('pt-BR') : '',
         c.cadastro ? new Date(c.cadastro).toLocaleDateString('pt-BR') : '',
         classificarCliente(c).txt
       ]);
     });
-    var csv = linhas.map(function(l) {
-      return l.map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';');
-    }).join('\n');
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'clientes-alpha-' + new Date().toISOString().slice(0, 10) + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('CSV exportado ✓');
+    baixarCSV(linhas, 'clientes-alpha-' + new Date().toISOString().slice(0, 10) + '.csv');
   }
 
   // ============================================
@@ -4113,7 +4217,6 @@
   // ============================================
   // PERFORMANCE — PERÍODO
   // ============================================
-  var STATUS_FATURADO = ['pago', 'enviado', 'entregue'];
 
   function inicioDoDia(d) {
     var x = new Date(d);
@@ -4234,6 +4337,7 @@
     renderTopProdutos(atual);
     renderTopClientes(atual);
     renderUltimosPedidos();
+    renderRelatorioClientes(atual, r);
     renderConversao(atual, r);
     aplicarBlurLock();
   }
@@ -4398,6 +4502,91 @@
       : '<div style="color:var(--text-faint);font-size:11px;">Sem clientes no período.</div>');
   }
 
+  // Relatório de clientes do painel: é aqui que os valores por cliente vivem
+  // (a lista da aba Clientes não mostra dinheiro). Fica sob o mesmo bloqueio
+  // por senha dos demais valores do painel.
+  var relClientesCache = [];
+
+  function renderRelatorioClientes(atual, r) {
+    var body = document.getElementById('relClientesBody');
+    if (!body) return;
+
+    var inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    var acc = {};
+
+    (allOrders || []).forEach(function(o) {
+      if (!STATUS_FATURADO.includes(o.status)) return;
+      var k = chaveCliente(o.cliente_nome, o.cliente_whatsapp, o.cliente_email);
+      if (!acc[k]) {
+        acc[k] = { chave: k, nome: o.cliente_nome || '—', whatsapp: o.cliente_whatsapp || '',
+                   pedidosPeriodo: 0, gastoPeriodo: 0, gastoMes: 0, total: 0, ultimo: null };
+      }
+      var c = acc[k];
+      var d = new Date(o.criado_em);
+      var v = num(o.total);
+      c.total += v;
+      if (d >= r.ini && d < r.fim) { c.pedidosPeriodo += 1; c.gastoPeriodo += v; }
+      if (d >= inicioMes) c.gastoMes += v;
+      if (!c.ultimo || o.criado_em > c.ultimo) c.ultimo = o.criado_em;
+    });
+
+    // Quem comprou no período aparece primeiro; o resto entra por total histórico.
+    relClientesCache = Object.keys(acc).map(function(k) { return acc[k]; })
+      .sort(function(a, b) {
+        if (b.gastoPeriodo !== a.gastoPeriodo) return b.gastoPeriodo - a.gastoPeriodo;
+        return b.total - a.total;
+      });
+
+    var comprasNoPeriodo = relClientesCache.filter(function(c) { return c.pedidosPeriodo > 0; });
+    setText('relClientesResumo', comprasNoPeriodo.length + ' compraram no período · ' + relClientesCache.length + ' no histórico');
+
+    var lista = relClientesCache.slice(0, 25);
+    body.innerHTML = lista.length
+      ? lista.map(function(c) {
+          return '<tr style="cursor:pointer;" onclick="openClientDetail(\'' + esc(c.chave) + '\')">' +
+            '<td>' + esc(c.nome) + '<small class="mono" style="display:block;color:var(--text-faint);font-size:10px;">' + esc(c.whatsapp || '—') + '</small></td>' +
+            '<td>' + c.pedidosPeriodo + '</td>' +
+            '<td class="blur-lock" style="color:var(--gold);">' + fmt(c.gastoPeriodo) + '</td>' +
+            '<td class="blur-lock">' + fmt(c.gastoMes) + '</td>' +
+            '<td class="blur-lock">' + fmt(c.total) + '</td>' +
+            '<td>' + (c.ultimo ? new Date(c.ultimo).toLocaleDateString('pt-BR') : '—') + '</td>' +
+            '</tr>';
+        }).join('') +
+        (relClientesCache.length > 25
+          ? '<tr><td colspan="6" style="color:var(--text-faint);font-size:10px;padding:10px;">Mostrando 25 de ' + relClientesCache.length + ' — use o CSV para a lista completa.</td></tr>'
+          : '')
+      : '<tr><td colspan="6" style="color:var(--text-faint);font-size:11px;padding:16px 10px;">Nenhuma compra registrada.</td></tr>';
+  }
+
+  function exportarRelatorioClientesCSV() {
+    if (!relClientesCache.length) { showToast('Nada para exportar', true); return; }
+    var r = getPerfRange();
+    var linhas = [['Cliente', 'WhatsApp', 'Pedidos no periodo', 'Gasto no periodo', 'Gasto no mes', 'Total historico', 'Ultimo pedido']];
+    relClientesCache.forEach(function(c) {
+      linhas.push([c.nome, c.whatsapp, c.pedidosPeriodo,
+        Number(c.gastoPeriodo).toFixed(2), Number(c.gastoMes).toFixed(2), Number(c.total).toFixed(2),
+        c.ultimo ? new Date(c.ultimo).toLocaleDateString('pt-BR') : '']);
+    });
+    baixarCSV(linhas, 'relatorio-clientes-' + r.ini.toISOString().slice(0, 10) + '_a_' + r.fim.toISOString().slice(0, 10) + '.csv');
+  }
+
+  // Geração de CSV compartilhada pelas duas exportações.
+  function baixarCSV(linhas, nomeArquivo) {
+    var csv = linhas.map(function(l) {
+      return l.map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';');
+    }).join('\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('CSV exportado ✓');
+  }
+
   function renderUltimosPedidos() {
     var body = document.getElementById('ultimosPedidosBody');
     if (!body) return;
@@ -4442,7 +4631,7 @@
   // Valores monetários ficam borrados até o admin desbloquear. Qualquer
   // elemento com a classe .blur-lock entra nessa proteção, inclusive os
   // renderizados depois (ranking, tabelas), via aplicarBlurLock().
-  var CANVAS_LOCK = ['faturamentoCanvas', 'canalCanvas', 'pagamentoCanvas', 'comparativoCanvas', 'ticketCanvas', 'revenueCatCanvas'];
+  var CANVAS_LOCK = ['faturamentoCanvas', 'canalCanvas', 'pagamentoCanvas', 'comparativoCanvas'];
 
   function aplicarBlurLock() {
     var filtro = perfRevelada ? 'none' : 'blur(6px)';
