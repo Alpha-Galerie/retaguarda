@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin · Alpha Galerie · v2026.05.06-B</title>
+  <title>Admin · Alpha Galerie · v2026.09.08</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -928,6 +928,9 @@
         <span class="login-logo-text">alpha.galerie</span>
       </div>
       <div class="login-sub">PAINEL ADMINISTRATIVO</div>
+      <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;color:var(--text-faint);margin-bottom:20px;">
+        v2026.09.08 · LOGIN SUPABASE
+      </div>
 
       <form id="loginForm" onsubmit="doLogin(event)">
         <div class="form-group">
@@ -960,6 +963,12 @@
         </div>
         <button type="submit" class="btn btn-gold" style="width:100%;">SALVAR NOVA SENHA</button>
         <div class="login-error" id="recoveryError"></div>
+        <div style="text-align:center;margin-top:14px;">
+          <button type="button" onclick="voltarParaLogin()"
+            style="background:none;border:none;color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;text-decoration:underline;cursor:pointer;">
+            VOLTAR PARA O LOGIN
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -1992,6 +2001,16 @@
     document.getElementById('loginForm').style.display = 'none';
     document.getElementById('recoveryForm').style.display = '';
     document.querySelector('.login-sub').textContent = 'DEFINA UMA NOVA SENHA';
+  }
+
+  // Se o link de recuperação já tiver sido usado ou expirado, é preciso
+  // conseguir voltar ao login normal em vez de ficar preso nesta tela.
+  function voltarParaLogin() {
+    history.replaceState(null, '', location.pathname + location.search);
+    document.getElementById('recoveryForm').style.display = 'none';
+    document.getElementById('loginForm').style.display = '';
+    document.getElementById('recoveryError').textContent = '';
+    document.querySelector('.login-sub').textContent = 'PAINEL ADMINISTRATIVO';
   }
 
   function entrarNoApp() {
