@@ -931,11 +931,35 @@
 
       <form id="loginForm" onsubmit="doLogin(event)">
         <div class="form-group">
+          <label>E-mail</label>
+          <input type="email" id="loginEmail" required autocomplete="username" placeholder="seu@email.com" autofocus />
+        </div>
+        <div class="form-group">
           <label>Senha</label>
-          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Digite sua senha" autofocus />
+          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Digite sua senha" />
         </div>
         <button type="submit" class="btn btn-gold" id="loginBtn" style="width:100%;">ENTRAR</button>
         <div class="login-error" id="loginError"></div>
+        <div style="text-align:center;margin-top:14px;">
+          <button type="button" onclick="esqueciSenha()"
+            style="background:none;border:none;color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;text-decoration:underline;cursor:pointer;">
+            ESQUECI MINHA SENHA
+          </button>
+        </div>
+      </form>
+
+      <!-- Definir nova senha (fluxo de recuperação por e-mail) -->
+      <form id="recoveryForm" onsubmit="definirNovaSenha(event)" style="display:none;">
+        <div class="form-group">
+          <label>Nova senha</label>
+          <input type="password" id="recoveryPassword" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres" />
+        </div>
+        <div class="form-group">
+          <label>Repita a nova senha</label>
+          <input type="password" id="recoveryPassword2" required minlength="8" autocomplete="new-password" placeholder="Repita a senha" />
+        </div>
+        <button type="submit" class="btn btn-gold" style="width:100%;">SALVAR NOVA SENHA</button>
+        <div class="login-error" id="recoveryError"></div>
       </form>
     </div>
   </div>
@@ -1393,10 +1417,10 @@
             <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:16px;">🔒 SEGURANÇA</div>
 
             <div style="margin-bottom:16px;">
-              <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">SENHA ADMIN (atual)</label>
+              <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">SENHA ATUAL DA CONTA</label>
               <input type="password" id="senhaAtual" placeholder="••••••••" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;margin-bottom:8px;" />
               <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">NOVA SENHA</label>
-              <input type="password" id="senhaNova" placeholder="mínimo 4 dígitos" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;margin-bottom:8px;" />
+              <input type="password" id="senhaNova" placeholder="mínimo 8 caracteres" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;margin-bottom:8px;" />
               <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">CONFIRMAR NOVA SENHA</label>
               <input type="password" id="senhaConfirm" placeholder="repita a nova senha" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;margin-bottom:12px;" />
               <button onclick="trocarSenha()" style="width:100%;background:var(--gold);color:#000;border:none;padding:12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">ATUALIZAR SENHA</button>
@@ -1882,16 +1906,136 @@
   var clientesIndex = [];
 
   // ============================================
-  // SENHA
+  // AUTENTICAÇÃO
+  // --------------------------------------------
+  // O acesso é uma sessão real do Supabase Auth. Isso não é só uma tela de
+  // senha: as policies do banco liberam leitura de pedidos/clientes e
+  // escrita em produtos apenas para quem está autenticado como admin.
+  // Sem sessão, a chave anon da loja não enxerga nem altera nada disso.
   // ============================================
-  function getSenha() { return '1234'; }
+  var sessaoAtual = null;
+
+  function emailLogado() {
+    return sessaoAtual && sessaoAtual.user ? (sessaoAtual.user.email || '') : '';
+  }
+
+  function mensagemErroLogin(err) {
+    var m = String((err && err.message) || err || '');
+    if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+    if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado no Supabase.';
+    if (/rate limit|too many/i.test(m)) return 'Muitas tentativas. Aguarde um minuto e tente de novo.';
+    return m || 'Não foi possível entrar.';
+  }
+
+  async function doLogin(e) {
+    e.preventDefault();
+    var email = (document.getElementById('loginEmail').value || '').trim();
+    var senha = document.getElementById('loginPassword').value;
+    var btn = document.getElementById('loginBtn');
+    var erro = document.getElementById('loginError');
+    erro.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'ENTRANDO...';
+
+    try {
+      var res = await sb.auth.signInWithPassword({ email: email, password: senha });
+      if (res.error) throw res.error;
+      sessaoAtual = res.data.session;
+      entrarNoApp();
+    } catch (err) {
+      erro.textContent = mensagemErroLogin(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'ENTRAR';
+    }
+    return false;
+  }
+
+  async function esqueciSenha() {
+    var email = (document.getElementById('loginEmail').value || '').trim();
+    var erro = document.getElementById('loginError');
+    if (!email) {
+      erro.textContent = 'Digite seu e-mail acima primeiro.';
+      return;
+    }
+    try {
+      var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
+      if (res.error) throw res.error;
+      erro.style.color = 'var(--green)';
+      erro.textContent = 'Enviamos um link de redefinição para ' + email + '.';
+    } catch (err) {
+      erro.style.color = '';
+      erro.textContent = mensagemErroLogin(err);
+    }
+  }
+
+  async function definirNovaSenha(e) {
+    e.preventDefault();
+    var p1 = document.getElementById('recoveryPassword').value;
+    var p2 = document.getElementById('recoveryPassword2').value;
+    var erro = document.getElementById('recoveryError');
+    erro.textContent = '';
+    if (p1 !== p2) { erro.textContent = 'As senhas não conferem.'; return false; }
+    if (p1.length < 8) { erro.textContent = 'Use pelo menos 8 caracteres.'; return false; }
+    try {
+      var res = await sb.auth.updateUser({ password: p1 });
+      if (res.error) throw res.error;
+      history.replaceState(null, '', location.pathname + location.search);
+      entrarNoApp();
+    } catch (err) {
+      erro.textContent = mensagemErroLogin(err);
+    }
+    return false;
+  }
+
+  function mostrarRecuperacao() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('recoveryForm').style.display = '';
+    document.querySelector('.login-sub').textContent = 'DEFINA UMA NOVA SENHA';
+  }
+
+  function entrarNoApp() {
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('app').classList.add('show');
+    var info = document.getElementById('userInfo');
+    if (info) info.textContent = emailLogado();
+    loadAll();
+  }
+
+  async function doLogout() {
+    try { await sb.auth.signOut(); } catch (e) { console.warn(e); }
+    location.reload();
+  }
+
+  // Restaura a sessão salva (o supabase-js persiste no localStorage) e
+  // trata o retorno do link de redefinição de senha.
+  sb.auth.onAuthStateChange(function(evento, sessao) {
+    sessaoAtual = sessao;
+    if (evento === 'PASSWORD_RECOVERY') mostrarRecuperacao();
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    sb.auth.getSession().then(function(res) {
+      var sessao = res && res.data ? res.data.session : null;
+      // Se o usuário chegou por um link de recuperação, a tela de nova
+      // senha tem prioridade sobre o auto-login.
+      if (String(location.hash || '').indexOf('type=recovery') >= 0) {
+        sessaoAtual = sessao;
+        mostrarRecuperacao();
+        return;
+      }
+      if (sessao) {
+        sessaoAtual = sessao;
+        entrarNoApp();
+      }
+    });
+  });
 
   function isMissingTableError(error) {
     if (!error) return false;
     var message = String(error.message || error || '').toLowerCase();
     return error.code === '42P01' || message.includes('does not exist') || message.includes('relation');
   }
-
   async function loadVariacoesFromTable(table, productIds) {
     // FIX: Removed .order() to prevent timeout with large datasets. Sorting done in JavaScript.
     var res = await sb.from(table).select('*').in('produto_id', productIds);
@@ -1914,18 +2058,15 @@
 
     return { table: table, available: true, variacoes: variacoes };
   }
-
   async function loadVariacoesForProducts(productIds) {
     var primary = await loadVariacoesFromTable('variacoes', productIds);
 
     return { table: 'variacoes', variacoes: primary.available ? primary.variacoes : [] };
   }
-
   async function loadVariacoesForProduct(productId) {
     var result = await loadVariacoesForProducts([productId]);
     return result.variacoes || [];
   }
-
   function applyCategoryLinks(products) {
     products.forEach(function(p) {
       if (!p.categorias && p.categoria_id && allCategories.length) {
@@ -1934,7 +2075,6 @@
       }
     });
   }
-
   async function persistVariacoes(table, removedIds, currentVariacoes, prodId) {
     if (removedIds.length) {
       await sb.from(table).delete().in('id', removedIds);
@@ -1961,37 +2101,6 @@
   }
 
   // ============================================
-  // LOGIN / LOGOUT
-  // ============================================
-  function doLogin(e) {
-    e.preventDefault();
-    var senha = document.getElementById('loginPassword').value.trim();
-    if (senha === getSenha()) {
-      sessionStorage.setItem('ag_ok', '1');
-      entrarNoApp();
-    } else {
-      document.getElementById('loginError').textContent = 'Senha incorreta.';
-    }
-    return false;
-  }
-
-  function entrarNoApp() {
-    document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('app').classList.add('show');
-    loadAll();
-  }
-
-  function doLogout() {
-    sessionStorage.removeItem('ag_ok');
-    location.reload();
-  }
-
-  // Auto-login se já estava autenticado
-  if (sessionStorage.getItem('ag_ok') === '1') {
-    document.addEventListener('DOMContentLoaded', entrarNoApp);
-  }
-
-  // ============================================
   // CARREGAR TUDO
   // ============================================
   async function loadAll() {
@@ -2001,6 +2110,19 @@
     montarIndiceClientes();
     renderStats();
     try { renderPerformance(); } catch (e) { console.warn('Performance:', e); }
+  }
+
+  // As policies do banco recusam a leitura quando não há sessão de admin.
+  // Sem isso o erro passaria despercebido (foi assim que a lista de
+  // clientes ficou vazia sem ninguém notar).
+  function avisarSeSemPermissao(err, tabela) {
+    var msg = String((err && (err.message || err.hint)) || err || '');
+    var codigo = err && err.code ? String(err.code) : '';
+    var semPermissao = codigo === '42501' || codigo === 'PGRST301' ||
+      /permission denied|row-level security|JWT|not authorized/i.test(msg);
+    if (!semPermissao) return false;
+    showToast('Sem permissão para ler "' + tabela + '". Saia e entre novamente.', true);
+    return true;
   }
 
   async function loadOrders() {
@@ -2022,7 +2144,9 @@
       console.error('Erro ao carregar pedidos:', e);
       allOrders = [];
       renderOrders();
-      alert('Erro ao carregar pedidos: ' + (e.message || e));
+      if (!avisarSeSemPermissao(e, 'pedidos')) {
+        showToast('Erro ao carregar pedidos: ' + (e.message || e), true);
+      }
     }
   }
 
@@ -3563,15 +3687,27 @@
     }
   }
 
+  // Reconfirma a senha da conta logada junto ao Supabase. Usado nas ações
+  // sensíveis; substitui a antiga senha fixa no JavaScript.
+  async function confirmarSenhaAdmin(titulo) {
+    var email = emailLogado();
+    if (!email) { alert('Sessão expirada. Entre novamente.'); return false; }
+    var senha = prompt(titulo + '\n\nConfirme a senha de ' + email + ':');
+    if (senha === null) return false;
+    var res = await sb.auth.signInWithPassword({ email: email, password: senha });
+    if (res.error) { alert('Senha incorreta.'); return false; }
+    sessaoAtual = res.data.session;
+    return true;
+  }
+
   async function excluirProduto() {
     var id = document.getElementById('pId').value;
     var nome = document.getElementById('pNome').value;
     if (!id) return;
-    var senha = prompt('⚠ Excluir "' + nome + '"\nDigite a senha admin:');
-    if (senha === null) return;
-    if (senha !== getSenha()) { alert('Senha incorreta'); return; }
+    if (!await confirmarSenhaAdmin('⚠ Excluir "' + nome + '"')) return;
     if (!confirm('Excluir permanentemente "' + nome + '"?')) return;
-    await sb.from('produtos').delete().eq('id', id);
+    var del = await sb.from('produtos').delete().eq('id', id);
+    if (del.error) { showToast('Erro ao excluir: ' + del.error.message, true); return; }
     allProducts = allProducts.filter(function(p) { return p.id !== parseInt(id); });
     closeModal('prodModal');
     renderProducts();
@@ -3677,7 +3813,12 @@
 
   async function loadClients() {
     var res = await sb.from('clientes').select('*').order('criado_em', { ascending: false });
-    if (res.error) console.warn('Tabela clientes indisponível (RLS):', res.error.message);
+    if (res.error) {
+      // Sem sessão de admin as policies devolvem erro; a lista ainda é
+      // montada a partir dos pedidos, então isso é aviso, não falha fatal.
+      console.warn('Tabela clientes indisponível:', res.error.message);
+      avisarSeSemPermissao(res.error, 'clientes');
+    }
     allClients = res.data || [];
     montarIndiceClientes();
     renderClients();
@@ -4293,7 +4434,7 @@
     });
   }
 
-  function revelarTudoPerformance() {
+  async function revelarTudoPerformance() {
     var btn = document.getElementById('btnDesbloquear');
     if (perfRevelada) {
       perfRevelada = false;
@@ -4301,9 +4442,7 @@
       if (btn) btn.textContent = '🔒 DESBLOQUEAR';
       return;
     }
-    var senha = prompt('🔒 Senha admin:');
-    if (senha === null) return;
-    if (senha !== getSenha()) { alert('Senha incorreta'); return; }
+    if (!await confirmarSenhaAdmin('🔒 Mostrar os valores da loja')) return;
     perfRevelada = true;
     aplicarBlurLock();
     if (btn) btn.textContent = '🔓 BLOQUEAR';
@@ -4504,17 +4643,33 @@
     renderFuncionarios();
   }
 
-  function trocarSenha() {
+  async function trocarSenha() {
     var atual = document.getElementById('senhaAtual').value;
     var nova = document.getElementById('senhaNova').value;
     var conf = document.getElementById('senhaConfirm').value;
     var msg = document.getElementById('senhaMsg');
-    if (atual !== getSenha()) { msg.style.color = 'var(--red)'; msg.textContent = 'Senha atual incorreta'; return; }
-    if (nova.length < 4) { msg.style.color = 'var(--red)'; msg.textContent = 'Mínimo 4 caracteres'; return; }
-    if (nova !== conf) { msg.style.color = 'var(--red)'; msg.textContent = 'Senhas não conferem'; return; }
-    localStorage.setItem('ag_senha_admin', nova);
+    var erro = function(t) { msg.style.color = 'var(--red)'; msg.textContent = t; };
+
+    if (nova.length < 8) return erro('Mínimo 8 caracteres');
+    if (nova !== conf) return erro('Senhas não conferem');
+
+    var email = emailLogado();
+    if (!email) return erro('Sessão expirada. Entre novamente.');
+
+    msg.style.color = 'var(--text-dim)';
+    msg.textContent = 'Alterando...';
+
+    // Reconfere a senha atual antes de trocar — a troca é feita na conta
+    // do Supabase, não mais em localStorage.
+    var login = await sb.auth.signInWithPassword({ email: email, password: atual });
+    if (login.error) return erro('Senha atual incorreta');
+    sessaoAtual = login.data.session;
+
+    var upd = await sb.auth.updateUser({ password: nova });
+    if (upd.error) return erro(mensagemErroLogin(upd.error));
+
     msg.style.color = 'var(--green)';
-    msg.textContent = '✓ Senha atualizada!';
+    msg.textContent = '✓ Senha da conta ' + email + ' atualizada!';
     document.getElementById('senhaAtual').value = '';
     document.getElementById('senhaNova').value = '';
     document.getElementById('senhaConfirm').value = '';
