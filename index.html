@@ -1361,6 +1361,11 @@
             <option value="com">Com estoque</option>
             <option value="sem">Sem estoque</option>
           </select>
+          <select id="prodVitrineFilter" onchange="renderProducts()" title="Vitrine de destaques da home" style="background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;min-width:150px;">
+            <option value="">TODA A VITRINE</option>
+            <option value="destaque">★ Só destaques</option>
+            <option value="promo">% Só promoções</option>
+          </select>
           <span id="prodCount" class="mono" style="color:var(--text-faint);font-size:11px;padding:10px 0;white-space:nowrap;"></span>
           <button onclick="copiarLinkFiltroAtual()" title="Copiar link desta categoria/subcategoria"
             style="background:none;border:1px solid var(--line);color:var(--gold);padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;white-space:nowrap;">
@@ -1844,6 +1849,15 @@
         </div>
 
         <div class="form-group">
+          <label>Preço promocional <span style="color:var(--text-faint);font-size:9px;">DE / POR — deixe vazio se não tiver promoção</span></label>
+          <input type="text" id="pPrecoPromo" placeholder="Ex: 75,00" oninput="calcularPix()"
+            style="font-size:16px;" />
+          <div id="pPromoHint" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:6px;letter-spacing:0.05em;">
+            Com promoção o site risca o preço normal e mostra o selo de desconto.
+          </div>
+        </div>
+
+        <div class="form-group">
           <label>Estoque</label>
           <input type="text" id="pEstoque" placeholder="Ex: 10" value="0"
             style="font-size:16px;" />
@@ -1905,7 +1919,7 @@
         </div>
         <div class="form-checkbox">
           <input type="checkbox" id="pDestaque" />
-          <label for="pDestaque">Destaque (aparece primeiro no site)</label>
+          <label for="pDestaque">Destaque (entra na vitrine "Destaques" da home)</label>
         </div>
 
         <div class="form-actions" style="justify-content:space-between;">
@@ -2226,7 +2240,7 @@
     productsLoading = true;
     try {
       // Carregamento progressivo por id para evitar OFFSET caro e abrir a tela rápido.
-      var COLS = 'id,nome,codigo,codigo_barras,marca,descricao,preco,preco_pix,categoria_id,subcategoria,estoque,ativo,destaque,imagem_url,criado_em';
+      var COLS = 'id,nome,codigo,codigo_barras,marca,descricao,preco,preco_pix,preco_promocional,categoria_id,subcategoria,estoque,ativo,destaque,imagem_url,criado_em';
       var CHUNK_SIZE = 200;
 
       var firstRes = await sb.from('produtos').select(COLS).order('id', { ascending: false }).limit(CHUNK_SIZE);
@@ -3706,6 +3720,17 @@
     return null;
   }
 
+  // Promoção: preço promocional preenchido e menor que o preço cheio.
+  function emPromocao(p) {
+    var promo = Number(p.preco_promocional || 0);
+    return promo > 0 && promo < Number(p.preco || 0);
+  }
+
+  function descontoPercent(p) {
+    if (!emPromocao(p)) return 0;
+    return Math.round(((Number(p.preco) - Number(p.preco_promocional)) / Number(p.preco)) * 100);
+  }
+
   function renderProductRow(p) {
     var varStr = '';
     var vars = p._variacoes || [];
@@ -3735,7 +3760,8 @@
         '</select>' +
       '</td>' +
       '<td>' +
-        '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'preco\',this.textContent)" style="color:var(--gold);font-weight:600;outline:none;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'">' + Number(p.preco || 0).toFixed(2) + '</div>' +
+        '<div contenteditable="true" onblur="salvarInline(' + p.id + ',\'preco\',this.textContent)" style="color:var(--gold);font-weight:600;outline:none;border-bottom:1px dashed transparent;' + (emPromocao(p) ? 'text-decoration:line-through;opacity:0.6;' : '') + '" onmouseenter="this.style.borderBottomColor=\'var(--gold)\'" onmouseleave="this.style.borderBottomColor=\'transparent\'">' + Number(p.preco || 0).toFixed(2) + '</div>' +
+        (emPromocao(p) ? '<span class="dim" style="color:var(--orange);">PROMO: ' + fmt(p.preco_promocional) + ' (-' + descontoPercent(p) + '%)</span>' : '') +
         (p.preco_pix ? '<span class="dim">PIX: ' + fmt(p.preco_pix) + '</span>' : '') +
       '</td>' +
       '<td>' +
@@ -3744,6 +3770,7 @@
       '<td><span class="' + (p.ativo ? 'ativo-yes' : 'ativo-no') + ' mono" onclick="toggleAtivo(' + p.id + ',' + p.ativo + ')" style="cursor:pointer;">' + (p.ativo ? '● ATIVO' : '○ INATIVO') + '</span></td>' +
       '<td><span style="color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="editProd(' + p.id + ')">EDITAR →</span></td>' +
       '<td style="display:flex;gap:6px;align-items:center;">' +
+        '<button onclick="toggleDestaque(' + p.id + ')" style="background:' + (p.destaque ? 'var(--gold)' : 'none') + ';border:1px solid ' + (p.destaque ? 'var(--gold)' : 'var(--line)') + ';color:' + (p.destaque ? '#000' : 'var(--text-faint)') + ';padding:3px 7px;font-size:10px;cursor:pointer;" title="' + (p.destaque ? 'Tirar da vitrine de destaques' : 'Colocar na vitrine de destaques da home') + '">★</button>' +
         '<button onclick="copiarLinkProd(event,' + p.id + ')" style="background:none;border:1px solid var(--line);color:var(--text-faint);padding:3px 7px;font-size:10px;cursor:pointer;" title="Copiar link">🔗</button>' +
         '<button onclick="duplicarProd(' + p.id + ')" style="background:none;border:1px solid var(--line);color:var(--gold);padding:3px 7px;font-size:10px;cursor:pointer;font-family:\'JetBrains Mono\',monospace;letter-spacing:0.08em;" title="Duplicar produto">⊕ DUP</button>' +
       '</td>' +
@@ -3755,6 +3782,7 @@
     var catF = document.getElementById('prodCatFilter') ? document.getElementById('prodCatFilter').value : '';
     var subF = document.getElementById('prodSubFilter') ? document.getElementById('prodSubFilter').value : '';
     var estF = document.getElementById('prodEstoqueFilter') ? document.getElementById('prodEstoqueFilter').value : '';
+    var vitF = document.getElementById('prodVitrineFilter') ? document.getElementById('prodVitrineFilter').value : '';
 
     var list = allProducts.slice();
     if (search) list = list.filter(function(p) {
@@ -3764,6 +3792,8 @@
     if (subF) list = list.filter(function(p) { return p.subcategoria === subF; });
     if (estF === 'com') list = list.filter(function(p) { return p.estoque > 0; });
     if (estF === 'sem') list = list.filter(function(p) { return !p.estoque || p.estoque <= 0; });
+    if (vitF === 'destaque') list = list.filter(function(p) { return !!p.destaque; });
+    if (vitF === 'promo') list = list.filter(emPromocao);
 
     var countEl = document.getElementById('prodCount');
     if (countEl) countEl.textContent = list.length + ' produtos';
@@ -3810,7 +3840,11 @@
     if (p[campo] == val) return;
     var upd = {};
     upd[campo] = val;
-    if (campo === 'preco') upd.preco_pix = parseFloat((val * 0.95).toFixed(2));
+    if (campo === 'preco') {
+      // Em promoção o Pix continua saindo do preço promocional.
+      var basePix = emPromocao(p) && Number(p.preco_promocional) < val ? Number(p.preco_promocional) : val;
+      upd.preco_pix = parseFloat((basePix * 0.95).toFixed(2));
+    }
     await sb.from('produtos').update(upd).eq('id', id);
     Object.assign(p, upd);
     toast('✓ Salvo', 'green');
@@ -3822,6 +3856,18 @@
     var p = allProducts.find(function(x) { return x.id === id; });
     if (p && cat) { p.categoria_id = parseInt(catId); p.categorias = cat; }
     toast('✓ Categoria salva', 'green');
+  }
+
+  // Liga/desliga o produto na vitrine "Destaques" da home do site.
+  async function toggleDestaque(id) {
+    var p = allProducts.find(function(x) { return x.id === id; });
+    if (!p) return;
+    var novo = !p.destaque;
+    var res = await sb.from('produtos').update({ destaque: novo }).eq('id', id);
+    if (res && res.error) { toast('Erro ao salvar destaque', 'red'); return; }
+    p.destaque = novo;
+    renderProducts();
+    toast(novo ? '★ Em destaque na home' : 'Fora dos destaques', 'green');
   }
 
   async function toggleAtivo(id, ativo) {
@@ -3888,6 +3934,8 @@
     document.getElementById('pCategoria').value = p.categoria_id || '';
     document.getElementById('pPreco').value = p.preco ? String(p.preco).replace('.', ',') : '';
     document.getElementById('pPrecoPix').value = p.preco_pix ? String(p.preco_pix).replace('.', ',') : '';
+    document.getElementById('pPrecoPromo').value = p.preco_promocional ? String(p.preco_promocional).replace('.', ',') : '';
+    refreshPromoHint();
     document.getElementById('pEstoque').value = p.estoque || 0;
     document.getElementById('pImagem').value = p.imagem_url || '';
     document.getElementById('pDescricao').value = p.descricao || '';
@@ -3966,6 +4014,7 @@
     document.getElementById('prodForm').reset();
     document.getElementById('pId').value = '';
     document.getElementById('pAtivo').checked = true;
+    refreshPromoHint();
     document.getElementById('btnExcluirProd').style.display = 'none';
     variacoes = [];
     variacoesRemovidas = [];
@@ -4000,6 +4049,8 @@
     document.getElementById('pCategoria').value = p.categoria_id || '';
     document.getElementById('pPreco').value = p.preco ? String(p.preco).replace('.', ',') : '';
     document.getElementById('pPrecoPix').value = p.preco_pix ? String(p.preco_pix).replace('.', ',') : '';
+    document.getElementById('pPrecoPromo').value = p.preco_promocional ? String(p.preco_promocional).replace('.', ',') : '';
+    refreshPromoHint();
     document.getElementById('pEstoque').value = p.estoque || 0;
     document.getElementById('pImagem').value = p.imagem_url || '';
     document.getElementById('pDescricao').value = p.descricao || '';
@@ -4033,7 +4084,39 @@
 
   function calcularPix() {
     var preco = parseFloat((document.getElementById('pPreco').value || '').replace(',', '.'));
-    if (preco > 0) document.getElementById('pPrecoPix').value = (preco * 0.95).toFixed(2).replace('.', ',');
+    var promo = parseFloat((document.getElementById('pPrecoPromo').value || '').replace(',', '.'));
+    // Em promoção o Pix é calculado sobre o preço promocional, senão sobre o cheio.
+    var base = (promo > 0 && (!(preco > 0) || promo < preco)) ? promo : preco;
+    if (base > 0) document.getElementById('pPrecoPix').value = (base * 0.95).toFixed(2).replace('.', ',');
+    atualizarHintPromo(preco, promo);
+  }
+
+  // Reaplica o aviso da promoção sem mexer no preço Pix já salvo.
+  function refreshPromoHint() {
+    atualizarHintPromo(
+      parseFloat((document.getElementById('pPreco').value || '').replace(',', '.')),
+      parseFloat((document.getElementById('pPrecoPromo').value || '').replace(',', '.'))
+    );
+  }
+
+  // Mostra em texto como a promoção vai sair no site (ou avisa quando não sai).
+  function atualizarHintPromo(preco, promo) {
+    var hint = document.getElementById('pPromoHint');
+    if (!hint) return;
+    if (!(promo > 0)) {
+      hint.style.color = 'var(--text-faint)';
+      hint.textContent = 'Com promoção o site risca o preço normal e mostra o selo de desconto.';
+      return;
+    }
+    if (!(preco > 0) || promo >= preco) {
+      hint.style.color = 'var(--red)';
+      hint.textContent = 'A promoção precisa ser menor que o preço normal — senão o site ignora.';
+      return;
+    }
+    hint.style.color = 'var(--green)';
+    hint.textContent = 'No site: de R$ ' + preco.toFixed(2).replace('.', ',') +
+      ' por R$ ' + promo.toFixed(2).replace('.', ',') +
+      ' — selo de -' + Math.round(((preco - promo) / preco) * 100) + '%.';
   }
 
   async function saveProd(e) {
@@ -4046,6 +4129,11 @@
     if (!catVal) { showToast('Selecione uma categoria', true); return; }
     var preco = parseFloat((document.getElementById('pPreco').value || '').replace(',', '.'));
     var pix = parseFloat((document.getElementById('pPrecoPix').value || '').replace(',', '.'));
+    var promo = parseFloat((document.getElementById('pPrecoPromo').value || '').replace(',', '.'));
+    if (promo > 0 && preco > 0 && promo >= preco) {
+      showToast('O preço promocional precisa ser menor que o preço normal', true);
+      return;
+    }
     var sub = document.getElementById('pSubcategoria').value.trim() || document.getElementById('pSubcategoriaSelect').value || null;
     var dados = {
       nome: document.getElementById('pNome').value.trim(),
@@ -4055,6 +4143,7 @@
       categoria_id: parseInt(catVal),
       preco: preco,
       preco_pix: pix || null,
+      preco_promocional: promo > 0 ? promo : null,
       estoque: parseInt(document.getElementById('pEstoque').value) || 0,
       imagem_url: document.getElementById('pImagem').value.trim() || null,
       descricao: document.getElementById('pDescricao').value.trim() || null,
