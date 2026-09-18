@@ -1247,37 +1247,98 @@
 
         <!-- VISITAS + CIDADES + LEADS -->
         <div class="panel">
-          <div class="panel-title"><span>Visitas do <em>site</em></span></div>
-          <div style="display:flex;gap:32px;margin-bottom:20px;flex-wrap:wrap;">
-            <div>
-              <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-faint);margin-bottom:4px;">HOJE</div>
-              <div style="font-family:'Cormorant Garamond',serif;font-size:36px;color:var(--gold);" id="visitasHoje">—</div>
+          <div class="panel-title">
+            <span>Visitas do <em>site</em></span>
+            <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <span class="mono" style="color:var(--text-faint);" id="visitasPeriodoLabel"></span>
+              <button class="btn-mini gold" onclick="exportarVisitasCSV()">⬇ CSV</button>
+            </span>
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom:20px;">
+            <div class="kpi">
+              <div class="kpi-label">Hoje</div>
+              <div class="kpi-value gold" id="visitasHoje">—</div>
+              <div class="kpi-sub" id="visitasHojeSub">—</div>
             </div>
-            <div>
-              <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-faint);margin-bottom:4px;">ESTE MÊS</div>
-              <div style="font-family:'Cormorant Garamond',serif;font-size:36px;" id="visitasMes">—</div>
+            <div class="kpi">
+              <div class="kpi-label">Média por dia</div>
+              <div class="kpi-value blue" id="visitasMedia">—</div>
+              <div class="kpi-sub" id="visitasMediaSub">—</div>
             </div>
-            <div>
-              <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-faint);margin-bottom:4px;">TOTAL HISTÓRICO</div>
-              <div style="font-family:'Cormorant Garamond',serif;font-size:36px;" id="visitasTotal">—</div>
+            <div class="kpi">
+              <div class="kpi-label">Visitas no período</div>
+              <div class="kpi-value" id="visitasPeriodo">—</div>
+              <div class="kpi-sub" id="visitasPeriodoSub">—</div>
             </div>
-            <div>
-              <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-faint);margin-bottom:4px;">MÉDIA/DIA (30D)</div>
-              <div style="font-family:'Cormorant Garamond',serif;font-size:36px;color:var(--blue);" id="visitasMedia">—</div>
+            <div class="kpi">
+              <div class="kpi-label">🤖 Robôs descartados</div>
+              <div class="kpi-value" style="color:var(--text-dim);" id="visitasRobos">—</div>
+              <div class="kpi-sub">não contam como visita</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Total histórico</div>
+              <div class="kpi-value" id="visitasTotal">—</div>
+              <div class="kpi-sub">desde o início</div>
             </div>
           </div>
-          <div style="height:150px;margin-bottom:20px;">
-            <canvas id="visitasCanvas" height="150"></canvas>
+
+          <div style="height:200px;margin-bottom:8px;">
+            <canvas id="visitasCanvas" height="200"></canvas>
           </div>
-          <div class="panel-grid-2">
+          <div class="mono" style="color:var(--text-faint);font-size:10px;margin-bottom:24px;">
+            Barras = visitas · Linha = pedidos feitos no mesmo dia
+          </div>
+
+          <!-- DETALHE DIA A DIA -->
+          <div style="margin-bottom:24px;">
+            <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">📅 DETALHE POR DIA</div>
+            <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
+              <table class="mini-table" style="min-width:560px;">
+                <thead>
+                  <tr><th>Dia</th><th>Visitas</th><th>Pedidos</th><th>Conversão</th><th>Receita</th></tr>
+                </thead>
+                <tbody id="visitasPorDiaBody">
+                  <tr><td colspan="5" style="color:var(--text-faint);font-size:11px;padding:16px 10px;">Carregando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- DIAS DA SEMANA + HORÁRIOS -->
+          <div class="panel-grid-2" style="margin-bottom:24px;">
             <div>
-              <div style="font-size:9px;letter-spacing:0.15em;color:var(--gold);margin-bottom:10px;">📍 TOP CIDADES</div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">📊 MELHORES E PIORES DIAS DA SEMANA</div>
+              <div id="visitasDiaSemana"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+            </div>
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">🕐 HORÁRIOS DE PICO</div>
+              <div style="height:170px;"><canvas id="horasCanvas" height="170"></canvas></div>
+              <div id="visitasHoraResumo" class="mono" style="color:var(--text-faint);font-size:10px;margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <!-- REGIÃO / CIDADES / DISPOSITIVO -->
+          <div class="panel-grid-3" style="margin-bottom:24px;">
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">📍 DE ONDE ACESSAM</div>
+              <div id="visitasRegiao"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+            </div>
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">🏙 TOP CIDADES</div>
               <div id="topCidades"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
             </div>
             <div>
-              <div style="font-size:9px;letter-spacing:0.15em;color:var(--green);margin-bottom:10px;">📲 LEADS CAPTURADOS</div>
-              <div id="leadsLista"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">📱 DISPOSITIVO</div>
+              <div id="visitasDispositivo"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin:16px 0 10px;">🔗 DE ONDE VEIO</div>
+              <div id="visitasOrigem"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
             </div>
+          </div>
+
+          <div>
+            <div class="mono" style="color:var(--green);font-size:10px;margin-bottom:10px;">📲 LEADS CAPTURADOS</div>
+            <div id="leadsLista"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
           </div>
         </div>
 
@@ -1975,7 +2036,6 @@
   var perfPeriodo = '30';
   // Status que contam como venda concretizada em todos os relatórios.
   var STATUS_FATURADO = ['pago', 'enviado', 'entregue'];
-  var visitasCache = null;
   var pedidoEdicao = null;
   var cliFiltro = 'todos';
   var clientesIndex = [];
@@ -2962,6 +3022,7 @@
   var chartCanal = null;
   var chartPagamento = null;
   var chartVisitas = null;
+  var chartHoras = null;
 
   function ensureCharts() {
     // Faturamento no período (linha + barras de pedidos)
@@ -3015,17 +3076,43 @@
       });
     }
 
-    var cVis = document.getElementById('visitasCanvas');
-    if (cVis && !chartVisitas) {
-      chartVisitas = new Chart(cVis, {
-        type: 'line',
-        data: { labels: [], datasets: [{ label: 'Visitas', data: [], borderColor: 'rgba(74,222,128,0.9)', backgroundColor: 'rgba(74,222,128,0.12)', fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2 }] },
+    var cHoras = document.getElementById('horasCanvas');
+    if (cHoras && !chartHoras) {
+      chartHoras = new Chart(cHoras, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ label: 'Visitas', data: [], backgroundColor: 'rgba(201,169,97,0.7)' }] },
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 10 }, grid: { display: false } },
+            x: { ticks: { color: '#555', font: { size: 8 }, maxTicksLimit: 12 }, grid: { display: false } },
             y: { beginAtZero: true, ticks: { color: '#555', font: { size: 9 }, precision: 0 }, grid: { color: 'rgba(255,255,255,0.04)' } }
+          }
+        }
+      });
+    }
+
+    var cVis = document.getElementById('visitasCanvas');
+    if (cVis && !chartVisitas) {
+      chartVisitas = new Chart(cVis, {
+        data: {
+          labels: [],
+          datasets: [
+            { type: 'bar', label: 'Visitas', data: [], yAxisID: 'y',
+              backgroundColor: 'rgba(74,222,128,0.45)', borderWidth: 0 },
+            { type: 'line', label: 'Pedidos', data: [], yAxisID: 'y1',
+              borderColor: 'rgba(201,169,97,1)', backgroundColor: 'rgba(201,169,97,0.1)',
+              tension: 0.3, pointRadius: 2, borderWidth: 2 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: true, labels: { color: '#888', font: { size: 10 }, boxWidth: 10 } } },
+          scales: {
+            x: { ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 12 }, grid: { display: false } },
+            y: { position: 'left', beginAtZero: true, ticks: { color: '#555', font: { size: 9 }, precision: 0 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y1: { position: 'right', beginAtZero: true, ticks: { color: '#555', font: { size: 9 }, precision: 0 }, grid: { drawOnChartArea: false } }
           }
         }
       });
@@ -4615,6 +4702,11 @@
       b.classList.toggle('active', b.dataset.perfperiodo === p);
     });
     renderPerformance();
+    // As visitas são agregadas no banco por período; refaz a consulta e
+    // recalcula a conversão com o número novo.
+    carregarVisitas().then(function() {
+      try { renderPerformance(); } catch (e) { console.warn(e); }
+    });
   }
 
   function irParaPedidos(status) {
@@ -4691,7 +4783,7 @@
     renderTopClientes(atual);
     renderUltimosPedidos();
     renderRelatorioClientes(atual, r);
-    renderConversao(atual, r);
+    renderConversao(atual);
     aplicarBlurLock();
   }
 
@@ -4961,16 +5053,10 @@
       : '<tr><td colspan="5" style="color:var(--text-faint);font-size:11px;padding:16px 10px;">Nenhum pedido ainda.</td></tr>';
   }
 
-  function renderConversao(atual, r) {
-    // Conversão = pedidos do período ÷ visitas do período (quando disponível).
-    if (!visitasCache) {
-      setText('kpiConversao', '—');
-      return;
-    }
-    var visitas = visitasCache.filter(function(v) {
-      var d = new Date(v.data || v.ts);
-      return d >= r.ini && d < r.fim;
-    }).length;
+  function renderConversao(atual) {
+    // Conversão = pedidos ÷ visitas reais do período. Usa o mesmo número
+    // agregado no banco (já sem robôs), para bater com o painel de visitas.
+    var visitas = visitasDados && visitasDados.resumo ? Number(visitasDados.resumo.periodo) : 0;
     if (!visitas) {
       setText('kpiConversao', '—');
       setHTML('kpiConversaoSub', 'sem visitas no período');
@@ -5040,73 +5126,179 @@
     } catch(e) { console.warn(e); }
   }
 
+  // ============================================
+  // VISITAS DO SITE
+  // --------------------------------------------
+  // A agregação é feita no banco (painel_visitas). Antes o painel puxava as
+  // linhas cruas de visitas_site sem ORDER BY nem paginação: o PostgREST
+  // corta em 1000 linhas, então voltavam as MAIS ANTIGAS e todo o período
+  // recente sumia — o painel mostrava "0 hoje / 0 este mês" com centenas de
+  // visitas registradas.
+  // ============================================
+  var visitasDados = null;
+
+  function nomeDiaCurto(iso) {
+    var d = new Date(iso + 'T12:00:00');
+    return ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][d.getDay()];
+  }
+
   async function carregarVisitas() {
     try {
-      var hoje = new Date().toISOString().slice(0, 10);
-      var inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-      // Uma leitura só (últimos 12 meses) alimenta contadores, gráfico,
-      // cidades e a taxa de conversão do painel.
-      var desde = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
-      var vAno = await sb.from('visitas_site').select('data,cidade,estado').gte('data', desde);
-      var vT = await sb.from('visitas_site').select('id', { count: 'exact', head: true });
-
-      visitasCache = vAno.data || [];
-      var doMes = visitasCache.filter(function(v) { return String(v.data) >= inicioMes; });
-      var deHoje = visitasCache.filter(function(v) { return String(v.data) === hoje; });
-
-      setText('visitasHoje', deHoje.length);
-      setText('visitasMes', doMes.length);
-      setText('visitasTotal', (vT.count !== null && vT.count !== undefined) ? vT.count : visitasCache.length);
-
-      var ult30 = visitasCache.filter(function(v) {
-        return new Date(v.data) >= new Date(Date.now() - 30 * 86400000);
-      });
-      setText('visitasMedia', Math.round(ult30.length / 30));
-
-      // Série diária dos últimos 30 dias
-      var labels = [], vals = [];
-      for (var i = 29; i >= 0; i--) {
-        var d = new Date(Date.now() - i * 86400000);
-        var key = d.toISOString().slice(0, 10);
-        labels.push(d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
-        vals.push(visitasCache.filter(function(v) { return String(v.data) === key; }).length);
+      var r = getPerfRange();
+      var res = await sb.rpc('painel_visitas', { p_dias: r.dias });
+      if (res.error) {
+        console.warn('painel_visitas:', res.error.message);
+        avisarSeSemPermissao(res.error, 'visitas');
+        return;
       }
-      ensureCharts();
-      if (chartVisitas) {
-        chartVisitas.data.labels = labels;
-        chartVisitas.data.datasets[0].data = vals;
-        chartVisitas.update();
-      }
+      visitasDados = res.data;
+      renderVisitas();
+    } catch (e) {
+      console.warn('Erro ao carregar visitas:', e);
+    }
 
-      var cm = {};
-      doMes.forEach(function(v) {
-        var k = [v.cidade, v.estado].filter(Boolean).join(', ') || 'Desconhecida';
-        cm[k] = (cm[k] || 0) + 1;
-      });
-      var top = Object.entries(cm).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 6);
-      setHTML('topCidades', top.length
-        ? top.map(function(pair, i) {
-            return '<div class="rank-row"><div class="rank-pos">' + (i + 1) + '</div>' +
-              '<div class="rank-name">' + esc(pair[0]) + '</div>' +
-              '<div class="rank-val">' + pair[1] + '</div></div>';
-          }).join('')
-        : '<div style="font-size:11px;color:var(--text-faint)">Sem dados ainda</div>');
-
+    try {
       var leads = await sb.from('leads_whatsapp').select('*').order('ts', { ascending: false }).limit(20);
       setHTML('leadsLista', !(leads.data || []).length
         ? '<div style="color:var(--text-faint);font-size:11px;">Nenhum lead ainda</div>'
         : (leads.data || []).map(function(l) {
             return '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);">' +
-              '<div style="flex:1;"><div style="font-size:12px;">' + esc(l.whatsapp) + '</div><div style="font-size:10px;color:var(--text-faint);">' + new Date(l.ts).toLocaleDateString('pt-BR') + ' · ' + esc(l.cupom || '—') + '</div></div>' +
+              '<div style="flex:1;"><div style="font-size:12px;">' + esc(l.whatsapp) + '</div>' +
+              '<div style="font-size:10px;color:var(--text-faint);">' + new Date(l.ts).toLocaleDateString('pt-BR') + ' · ' + esc(l.cupom || '—') + '</div></div>' +
               '<a href="https://wa.me/55' + String(l.whatsapp).replace(/\D/g, '') + '" target="_blank" style="padding:5px 10px;background:#25D366;color:#000;font-size:9px;font-weight:700;">CONTATAR</a>' +
               '</div>';
           }).join(''));
     } catch (e) { console.warn(e); }
   }
 
-  // ============================================
-  // CONFIGURAÇÕES
-  // ============================================
+  function renderVisitas() {
+    var d = visitasDados;
+    if (!d) return;
+    var res = d.resumo || {};
+
+    setText('visitasPeriodoLabel', new Date(d.inicio + 'T12:00:00').toLocaleDateString('pt-BR') +
+      ' — ' + new Date(d.fim + 'T12:00:00').toLocaleDateString('pt-BR'));
+    setText('visitasHoje', res.hoje);
+    setHTML('visitasHojeSub', 'ontem: ' + res.ontem);
+    setText('visitasMedia', String(res.media_dia).replace('.', ','));
+    setHTML('visitasMediaSub', 'visitantes por dia');
+    setText('visitasPeriodo', res.periodo);
+    setHTML('visitasPeriodoSub', 'em ' + d.periodo_dias + ' dias');
+    setText('visitasRobos', res.robos);
+    setText('visitasTotal', res.total_geral);
+
+    ensureCharts();
+    if (chartVisitas) {
+      chartVisitas.data.labels = (d.por_dia || []).map(function(x) {
+        return new Date(x.dia + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      });
+      chartVisitas.data.datasets[0].data = (d.por_dia || []).map(function(x) { return x.visitas; });
+      chartVisitas.data.datasets[1].data = (d.por_dia || []).map(function(x) { return x.pedidos; });
+      chartVisitas.update();
+    }
+
+    renderVisitasPorDia(d.por_dia || []);
+    renderDiaSemana(d.por_dia_semana || []);
+    renderHoras(d.por_hora || []);
+    renderListaSimples('visitasRegiao', d.por_regiao || [], 'regiao', res.periodo);
+    renderListaSimples('visitasDispositivo', d.por_dispositivo || [], 'dispositivo', res.periodo);
+    renderListaSimples('visitasOrigem', d.por_origem || [], 'origem', res.periodo);
+
+    var cidades = d.por_cidade || [];
+    setHTML('topCidades', cidades.length
+      ? cidades.slice(0, 8).map(function(c, i) {
+          return '<div class="rank-row"><div class="rank-pos">' + (i + 1) + '</div>' +
+            '<div class="rank-name">' + esc(c.cidade) + '<small>' + esc(c.uf || '') + '</small></div>' +
+            '<div class="rank-val">' + c.visitas + '</div></div>';
+        }).join('')
+      : '<div style="color:var(--text-faint);font-size:11px;">Sem dados ainda</div>');
+  }
+
+  function renderListaSimples(id, lista, campo, total) {
+    setHTML(id, lista.length
+      ? lista.map(function(x) {
+          var pct = total ? Math.round((x.visitas / total) * 100) : 0;
+          var pendente = /não coletado/i.test(String(x[campo]));
+          return '<div class="rank-row">' +
+            '<div class="rank-name"' + (pendente ? ' style="color:var(--text-faint);"' : '') + '>' + esc(x[campo]) +
+              '<small>' + pct + '%</small></div>' +
+            '<div class="rank-val">' + x.visitas + '</div></div>';
+        }).join('')
+      : '<div style="color:var(--text-faint);font-size:11px;">Sem dados</div>');
+  }
+
+  function renderVisitasPorDia(dias) {
+    var body = document.getElementById('visitasPorDiaBody');
+    if (!body) return;
+    var lista = dias.slice().reverse();          // mais recente primeiro
+    body.innerHTML = lista.length
+      ? lista.map(function(x) {
+          var conv = x.visitas ? (x.pedidos / x.visitas) * 100 : 0;
+          var semVisita = !x.visitas && !x.pedidos;
+          return '<tr' + (semVisita ? ' style="opacity:0.4;"' : '') + '>' +
+            '<td>' + new Date(x.dia + 'T12:00:00').toLocaleDateString('pt-BR') +
+              '<small class="mono" style="display:block;color:var(--text-faint);font-size:10px;">' + nomeDiaCurto(x.dia) + '</small></td>' +
+            '<td style="font-family:\'Cormorant Garamond\',serif;font-size:18px;' + (x.visitas ? 'color:var(--gold);' : '') + '">' + x.visitas + '</td>' +
+            '<td>' + x.pedidos + '</td>' +
+            '<td>' + (x.visitas ? conv.toFixed(1).replace('.', ',') + '%' : '—') + '</td>' +
+            '<td class="blur-lock">' + (num(x.receita) ? fmt(x.receita) : '—') + '</td>' +
+            '</tr>';
+        }).join('')
+      : '<tr><td colspan="5" style="color:var(--text-faint);font-size:11px;padding:16px 10px;">Sem visitas no período.</td></tr>';
+  }
+
+  function renderDiaSemana(dias) {
+    var max = Math.max.apply(null, dias.map(function(x) { return x.visitas; }).concat([1]));
+    var comVisita = dias.filter(function(x) { return x.visitas > 0; });
+    var melhor = comVisita.slice().sort(function(a, b) { return num(b.receita) - num(a.receita); })[0];
+    var pior = comVisita.slice().sort(function(a, b) { return num(a.receita) - num(b.receita); })[0];
+
+    setHTML('visitasDiaSemana', dias.map(function(x) {
+      var p = Math.round((x.visitas / max) * 100);
+      var conv = x.visitas ? (x.pedidos / x.visitas) * 100 : 0;
+      var cor = melhor && x.dow === melhor.dow ? 'var(--green)'
+              : (pior && x.dow === pior.dow ? 'var(--red)' : 'var(--gold)');
+      return '<div style="margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;gap:8px;">' +
+          '<span>' + x.nome +
+            (melhor && x.dow === melhor.dow ? ' <span style="color:var(--green);">← melhor</span>' : '') +
+            (pior && x.dow === pior.dow ? ' <span style="color:var(--red);">← pior</span>' : '') + '</span>' +
+          '<span class="mono" style="color:var(--text-dim);">' + x.visitas + ' vis · ' + x.pedidos + ' ped · ' +
+            conv.toFixed(1).replace('.', ',') + '% · <span class="blur-lock">' + fmt(x.receita) + '</span></span>' +
+        '</div>' +
+        '<div style="background:var(--bg);border:1px solid var(--line);height:6px;border-radius:4px;overflow:hidden;">' +
+          '<div style="height:100%;width:' + p + '%;background:' + cor + ';"></div></div>' +
+        '</div>';
+    }).join(''));
+  }
+
+  function renderHoras(horas) {
+    ensureCharts();
+    if (chartHoras) {
+      chartHoras.data.labels = horas.map(function(h) { return String(h.hora).padStart(2, '0') + 'h'; });
+      chartHoras.data.datasets[0].data = horas.map(function(h) { return h.visitas; });
+      chartHoras.update();
+    }
+    var top = horas.slice().sort(function(a, b) { return b.visitas - a.visitas; }).filter(function(h) { return h.visitas > 0; }).slice(0, 3);
+    setText('visitasHoraResumo', top.length
+      ? 'Pico: ' + top.map(function(h) { return String(h.hora).padStart(2, '0') + 'h (' + h.visitas + ')'; }).join(' · ')
+      : 'Sem dados no período');
+  }
+
+  function exportarVisitasCSV() {
+    if (!visitasDados) { showToast('Nada para exportar', true); return; }
+    var linhas = [['Dia', 'Dia da semana', 'Visitas', 'Pedidos', 'Conversao %', 'Receita', 'Robos']];
+    (visitasDados.por_dia || []).forEach(function(x) {
+      var conv = x.visitas ? (x.pedidos / x.visitas) * 100 : 0;
+      linhas.push([
+        new Date(x.dia + 'T12:00:00').toLocaleDateString('pt-BR'),
+        nomeDiaCurto(x.dia), x.visitas, x.pedidos,
+        conv.toFixed(1), Number(x.receita || 0).toFixed(2), x.robos
+      ]);
+    });
+    baixarCSV(linhas, 'visitas-por-dia-' + visitasDados.inicio + '_a_' + visitasDados.fim + '.csv');
+  }
+
   // ============================================
   // CUPONS
   // --------------------------------------------
