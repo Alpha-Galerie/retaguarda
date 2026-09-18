@@ -1574,6 +1574,116 @@
           </div>
         </div>
 
+        <!-- ENDEREÇO E CONTATO DA LOJA -->
+        <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">📍 ENDEREÇO E CONTATO DA LOJA</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-bottom:18px;line-height:1.6;">
+            É o que aparece no rodapé do site e também o endereço que o Google lê para a busca da região.
+            <strong style="color:var(--text-dim);">Escreva exatamente igual ao perfil do Google.</strong>
+            Quando os dois divergem, o Google não sabe em qual acreditar e a loja perde posição na busca local.
+          </div>
+
+          <!-- Prévia de como fica no rodapé do site -->
+          <div style="background:var(--bg);border:1px solid var(--line);padding:16px;margin-bottom:18px;">
+            <div class="mono" style="font-size:9px;color:var(--text-faint);margin-bottom:10px;">COMO VAI APARECER NO RODAPÉ DO SITE</div>
+            <div id="lojaPreviaLocal" style="font-size:13px;color:var(--text);line-height:1.6;">—</div>
+            <div id="lojaPreviaEndereco" style="font-size:12px;color:var(--text-dim);line-height:1.6;">—</div>
+            <div id="lojaPreviaContato" style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:8px;">—</div>
+            <div id="lojaPreviaInsta" style="font-size:12px;color:var(--gold);line-height:1.6;">—</div>
+            <div id="lojaPreviaHorario" style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-top:8px;white-space:pre-line;">—</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">RUA E NÚMERO</label>
+              <input id="lojaEndereco" oninput="atualizarPreviaLoja()" placeholder="Calçada Flôr de Lótus, 15"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">CEP</label>
+              <input id="lojaCep" oninput="atualizarPreviaLoja()" placeholder="06453-000"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">
+              COMPLEMENTO <span style="color:var(--text-faint);">(galeria, sala, ponto de referência)</span>
+            </label>
+            <input id="lojaComplemento" oninput="atualizarPreviaLoja()" placeholder="Centro Comercial Alphaville"
+              style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:12px;margin-bottom:12px;">
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">BAIRRO</label>
+              <input id="lojaBairro" oninput="atualizarPreviaLoja()" placeholder="Alphaville"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">CIDADE</label>
+              <input id="lojaCidade" oninput="atualizarPreviaLoja()" placeholder="Barueri"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">UF</label>
+              <input id="lojaUf" maxlength="2" oninput="this.value=this.value.toUpperCase();atualizarPreviaLoja()" placeholder="SP"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;text-align:center;" />
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">TELEFONE</label>
+              <input id="lojaTelefone" oninput="atualizarPreviaLoja()" placeholder="(11) 94292-0076"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">E-MAIL</label>
+              <input id="lojaEmail" oninput="atualizarPreviaLoja()" placeholder="contato@alphagalerie.com.br"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">
+                INSTAGRAM <span style="color:var(--text-faint);">(sem o @)</span>
+              </label>
+              <input id="lojaInstagram" oninput="atualizarPreviaLoja()" placeholder="alpha.galerie"
+                style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--line);padding-top:16px;margin-bottom:16px;">
+            <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);margin-bottom:10px;">HORÁRIO DE FUNCIONAMENTO</div>
+            <div style="display:grid;grid-template-columns:190px auto auto auto 1fr;gap:10px;align-items:center;margin-bottom:10px;">
+              <span style="font-size:12px;color:var(--text-dim);">Segunda a sábado</span>
+              <input type="time" id="lojaHoraSemanaAbre" oninput="atualizarPreviaLoja()"
+                style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:8px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+              <span style="font-size:12px;color:var(--text-faint);">às</span>
+              <input type="time" id="lojaHoraSemanaFecha" oninput="atualizarPreviaLoja()"
+                style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:8px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+            </div>
+            <div style="display:grid;grid-template-columns:190px auto auto auto 1fr;gap:10px;align-items:center;">
+              <span style="font-size:12px;color:var(--text-dim);">Domingo <span style="color:var(--text-faint);">(vazio = fecha)</span></span>
+              <input type="time" id="lojaHoraDomingoAbre" oninput="atualizarPreviaLoja()"
+                style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:8px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+              <span style="font-size:12px;color:var(--text-faint);">às</span>
+              <input type="time" id="lojaHoraDomingoFecha" oninput="atualizarPreviaLoja()"
+                style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:8px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button onclick="salvarLoja()" style="background:var(--gold);color:#000;border:none;padding:11px 22px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">SALVAR</button>
+            <button class="btn-mini" onclick="carregarLoja()">RECARREGAR</button>
+            <span id="lojaMsg" style="font-size:11px;"></span>
+          </div>
+
+          <div style="font-size:10px;color:var(--text-faint);margin-top:14px;line-height:1.6;border-top:1px solid var(--line);padding-top:12px;">
+            O rodapé do site lê estes dados direto do banco: salvou, o cliente já vê na próxima vez que abrir a página.
+            O endereço que o Google lê no código da página é gravado na publicação seguinte do site.
+          </div>
+        </div>
+
         <!-- SEO / GOOGLE -->
         <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
           <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">🔎 SEO — COMO A LOJA APARECE NO GOOGLE</div>
@@ -2581,6 +2691,7 @@
     }
     if (tab === 'configuracoes') {
       carregarCupons();
+      carregarLoja();
       carregarSeo();
       renderFuncionarios();
     }
@@ -5364,6 +5475,163 @@
   }
 
   // ============================================
+  // DADOS DA LOJA — endereço, contato e horário
+  // --------------------------------------------
+  // Estavam escritos à mão dentro do código do site, em dois lugares: o
+  // rodapé em React e o schema JSON-LD que o Google lê. Trocar o endereço
+  // exigia mexer em código e publicar. Agora saem da tabela `configuracoes`.
+  //
+  // O horário fica em campos separados de abre/fecha em vez de texto livre
+  // porque o schema do Google exige "11:00"/"21:00" exatos. De texto livre
+  // não dá para extrair isso de forma confiável.
+  // ============================================
+  var CAMPOS_LOJA = [
+    { chave: 'loja_endereco',           id: 'lojaEndereco' },
+    { chave: 'loja_complemento',        id: 'lojaComplemento' },
+    { chave: 'loja_bairro',             id: 'lojaBairro' },
+    { chave: 'loja_cidade',             id: 'lojaCidade' },
+    { chave: 'loja_uf',                 id: 'lojaUf' },
+    { chave: 'loja_cep',                id: 'lojaCep' },
+    { chave: 'loja_telefone',           id: 'lojaTelefone' },
+    { chave: 'loja_email',              id: 'lojaEmail' },
+    { chave: 'loja_instagram',          id: 'lojaInstagram' },
+    { chave: 'loja_hora_semana_abre',   id: 'lojaHoraSemanaAbre' },
+    { chave: 'loja_hora_semana_fecha',  id: 'lojaHoraSemanaFecha' },
+    { chave: 'loja_hora_domingo_abre',  id: 'lojaHoraDomingoAbre' },
+    { chave: 'loja_hora_domingo_fecha', id: 'lojaHoraDomingoFecha' }
+  ];
+
+  function valorLoja(id) {
+    var el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  // "11:00" vira "11h" e "11:30" vira "11h30" — é como se escreve horário
+  // em português, e é assim que o rodapé do site mostra.
+  function horaCurta(hhmm) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+    if (!m) return '';
+    return m[2] === '00' ? m[1] + 'h' : m[1] + 'h' + m[2];
+  }
+
+  // Uma hora vai colar a URL inteira do perfil aqui. Aceita "@alpha.galerie",
+  // "instagram.com/alpha.galerie" e a URL completa, e guarda só a arroba.
+  function normalizarInstagram(v) {
+    return String(v || '').trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/^instagram\.com\//i, '')
+      .replace(/^@/, '')
+      .replace(/[/?#].*$/, '')
+      .trim();
+  }
+
+  async function carregarLoja() {
+    var res = await sb.from('configuracoes').select('chave,valor')
+      .in('chave', CAMPOS_LOJA.map(function(c) { return c.chave; }));
+    if (res.error) {
+      console.warn('Dados da loja:', res.error.message);
+      avisarSeSemPermissao(res.error, 'configurações');
+      return;
+    }
+    var mapa = {};
+    (res.data || []).forEach(function(r) { mapa[r.chave] = r.valor; });
+    CAMPOS_LOJA.forEach(function(c) {
+      var el = document.getElementById(c.id);
+      if (el) el.value = mapa[c.chave] || '';
+    });
+    atualizarPreviaLoja();
+  }
+
+  // Monta a prévia exatamente como o rodapé do site monta, para o que se vê
+  // aqui ser o que sai lá.
+  function atualizarPreviaLoja() {
+    var rua = valorLoja('lojaEndereco');
+    var bairro = valorLoja('lojaBairro');
+    var cidade = valorLoja('lojaCidade');
+    var uf = valorLoja('lojaUf');
+    var cep = valorLoja('lojaCep');
+
+    var linha = rua;
+    if (bairro) linha += (linha ? ' — ' : '') + bairro;
+    if (cidade) linha += (linha ? ', ' : '') + cidade;
+    if (uf) linha += (cidade ? '/' : (linha ? ' ' : '')) + uf;
+    if (cep) linha += (linha ? ' · ' : '') + cep;
+
+    var tel = valorLoja('lojaTelefone');
+    var email = valorLoja('lojaEmail');
+    var insta = normalizarInstagram(valorLoja('lojaInstagram'));
+
+    var semana = horaCurta(valorLoja('lojaHoraSemanaAbre'));
+    var semanaF = horaCurta(valorLoja('lojaHoraSemanaFecha'));
+    var dom = horaCurta(valorLoja('lojaHoraDomingoAbre'));
+    var domF = horaCurta(valorLoja('lojaHoraDomingoFecha'));
+
+    var horario = [];
+    horario.push('Segunda a sábado · ' + (semana && semanaF ? semana + ' às ' + semanaF : 'não informado'));
+    horario.push('Domingo · ' + (dom && domF ? dom + ' às ' + domF : 'fechado'));
+
+    setText('lojaPreviaLocal', valorLoja('lojaComplemento') || '—');
+    setText('lojaPreviaEndereco', linha || 'Endereço não preenchido');
+    setText('lojaPreviaContato', [tel, email].filter(Boolean).join(' · ') || '—');
+    setText('lojaPreviaInsta', insta ? 'Instagram @' + insta : 'Instagram não preenchido');
+    setText('lojaPreviaHorario', horario.join('\n'));
+  }
+
+  async function salvarLoja() {
+    var msg = document.getElementById('lojaMsg');
+    var aviso = function(texto, cor) { if (msg) { msg.style.color = cor; msg.textContent = texto; } };
+
+    var uf = valorLoja('lojaUf');
+    var email = valorLoja('lojaEmail');
+    if (!valorLoja('lojaEndereco')) { aviso('Preencha a rua e o número', 'var(--red)'); return; }
+    if (!valorLoja('lojaCidade')) { aviso('Preencha a cidade', 'var(--red)'); return; }
+    if (!/^[A-Z]{2}$/.test(uf)) { aviso('UF precisa ter duas letras (ex: SP)', 'var(--red)'); return; }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { aviso('E-mail parece inválido', 'var(--red)'); return; }
+
+    // Meio horário não serve: o schema do Google precisa do par abre/fecha,
+    // e "11h às" no rodapé não diz nada ao cliente.
+    var pares = [
+      ['lojaHoraSemanaAbre', 'lojaHoraSemanaFecha', 'do horário de segunda a sábado'],
+      ['lojaHoraDomingoAbre', 'lojaHoraDomingoFecha', 'do horário de domingo']
+    ];
+    for (var p = 0; p < pares.length; p++) {
+      var a = valorLoja(pares[p][0]);
+      var f = valorLoja(pares[p][1]);
+      if ((a && !f) || (!a && f)) {
+        aviso('Preencha abertura e fechamento ' + pares[p][2] + ' (ou deixe os dois vazios)', 'var(--red)');
+        return;
+      }
+    }
+
+    // Guarda a arroba já limpa, para o site não precisar adivinhar formato.
+    var elInsta = document.getElementById('lojaInstagram');
+    if (elInsta) elInsta.value = normalizarInstagram(elInsta.value);
+
+    aviso('Salvando...', 'var(--text-dim)');
+    try {
+      for (var i = 0; i < CAMPOS_LOJA.length; i++) {
+        var c = CAMPOS_LOJA[i];
+        var upd = await sb.from('configuracoes')
+          .update({ valor: valorLoja(c.id), atualizado_em: new Date().toISOString() })
+          .eq('chave', c.chave)
+          .select('chave');
+        if (upd.error) throw upd.error;
+        // Um update que não acha a linha volta sem erro e sem ter gravado
+        // nada. Sem esta checagem, a tela diria "salvo" e o site continuaria
+        // com o dado antigo.
+        if (!upd.data || upd.data.length === 0) throw new Error('a chave ' + c.chave + ' não existe no banco');
+      }
+      atualizarPreviaLoja();
+      aviso('✓ Salvo. O rodapé do site já mostra o novo dado.', 'var(--green)');
+      toast('Dados da loja salvos', 'green');
+    } catch (e) {
+      console.error(e);
+      aviso('Erro ao salvar: ' + (e.message || e), 'var(--red)');
+    }
+  }
+
+  // ============================================
   // SEO — textos que o Google mostra
   // --------------------------------------------
   // Ficam na tabela `configuracoes`, que a loja lê com a chave pública. O
@@ -5429,8 +5697,10 @@
         var el = document.getElementById(c.id);
         var upd = await sb.from('configuracoes')
           .update({ valor: el ? el.value.trim() : '', atualizado_em: new Date().toISOString() })
-          .eq('chave', c.chave);
+          .eq('chave', c.chave)
+          .select('chave');
         if (upd.error) throw upd.error;
+        if (!upd.data || upd.data.length === 0) throw new Error('a chave ' + c.chave + ' não existe no banco');
       }
       aviso('✓ Salvo. Entra no ar na próxima publicação do site.', 'var(--green)');
       toast('Textos de SEO salvos', 'green');
