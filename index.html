@@ -1574,6 +1574,69 @@
           </div>
         </div>
 
+        <!-- SEO / GOOGLE -->
+        <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">🔎 SEO — COMO A LOJA APARECE NO GOOGLE</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-bottom:18px;line-height:1.6;">
+            Estes textos são o que o Google mostra quando alguém encontra a loja. Escreva pensando em quem
+            está procurando: seda, tabaco, piteira, narguilé, acessórios, pet shop, entrega em casa.
+            Vá acrescentando o que fizer sentido.
+          </div>
+
+          <!-- Prévia do resultado de busca -->
+          <div style="background:var(--bg);border:1px solid var(--line);padding:16px;margin-bottom:18px;">
+            <div class="mono" style="font-size:9px;color:var(--text-faint);margin-bottom:10px;">PRÉVIA NO GOOGLE</div>
+            <div style="font-size:11px;color:var(--text-dim);">alphagalerie.com</div>
+            <div id="seoPreviewTitulo" style="font-size:17px;color:#8ab4f8;margin:2px 0 3px;line-height:1.3;">—</div>
+            <div id="seoPreviewDesc" style="font-size:12px;color:var(--text-dim);line-height:1.5;">—</div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">
+              TÍTULO <span id="seoContaTitulo" style="color:var(--text-faint);"></span>
+            </label>
+            <input id="seoTitulo" oninput="atualizarPreviaSeo()" placeholder="Alpha Galerie — Seda, Piteira e Tabaco em Alphaville"
+              style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">
+              DESCRIÇÃO <span id="seoContaDesc" style="color:var(--text-faint);"></span>
+            </label>
+            <textarea id="seoDescricao" rows="3" oninput="atualizarPreviaSeo()"
+              placeholder="Tabacaria e headshop em Alphaville: seda, tabaco, piteira, narguilé..."
+              style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;resize:vertical;"></textarea>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">
+              PALAVRAS-CHAVE <span style="color:var(--text-faint);">(separe por vírgula)</span>
+            </label>
+            <textarea id="seoPalavras" rows="3"
+              placeholder="seda, tabaco, piteira, narguilé, acessórios, pet shop, recebe em casa, Alphaville"
+              style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;resize:vertical;"></textarea>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">
+              FRASE DE DESTAQUE <span style="color:var(--text-faint);">(usada ao compartilhar o link)</span>
+            </label>
+            <input id="seoFraseLoja" placeholder="Peça digital, receba em casa. Retirada na loja em Alphaville."
+              style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;" />
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button onclick="salvarSeo()" style="background:var(--gold);color:#000;border:none;padding:11px 22px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">SALVAR</button>
+            <button class="btn-mini" onclick="carregarSeo()">RECARREGAR</button>
+            <span id="seoMsg" style="font-size:11px;"></span>
+          </div>
+
+          <div style="font-size:10px;color:var(--text-faint);margin-top:14px;line-height:1.6;border-top:1px solid var(--line);padding-top:12px;">
+            Salvar já grava o texto. Ele entra no ar no site na próxima publicação — e o Google costuma
+            levar de alguns dias a semanas para refletir a mudança na busca.
+          </div>
+        </div>
+
         <!-- CUPONS -->
         <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
           <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">🏷 CUPONS DE DESCONTO</div>
@@ -2518,6 +2581,7 @@
     }
     if (tab === 'configuracoes') {
       carregarCupons();
+      carregarSeo();
       renderFuncionarios();
     }
   }
@@ -5297,6 +5361,83 @@
       ]);
     });
     baixarCSV(linhas, 'visitas-por-dia-' + visitasDados.inicio + '_a_' + visitasDados.fim + '.csv');
+  }
+
+  // ============================================
+  // SEO — textos que o Google mostra
+  // --------------------------------------------
+  // Ficam na tabela `configuracoes`, que a loja lê com a chave pública. O
+  // site aplica na publicação, então editar aqui não exige mexer em código.
+  // ============================================
+  var CAMPOS_SEO = [
+    { chave: 'seo_titulo',     id: 'seoTitulo' },
+    { chave: 'seo_descricao',  id: 'seoDescricao' },
+    { chave: 'seo_palavras',   id: 'seoPalavras' },
+    { chave: 'seo_frase_loja', id: 'seoFraseLoja' }
+  ];
+
+  async function carregarSeo() {
+    var res = await sb.from('configuracoes').select('chave,valor')
+      .in('chave', CAMPOS_SEO.map(function(c) { return c.chave; }));
+    if (res.error) {
+      console.warn('SEO:', res.error.message);
+      avisarSeSemPermissao(res.error, 'configurações');
+      return;
+    }
+    var mapa = {};
+    (res.data || []).forEach(function(r) { mapa[r.chave] = r.valor; });
+    CAMPOS_SEO.forEach(function(c) {
+      var el = document.getElementById(c.id);
+      if (el) el.value = mapa[c.chave] || '';
+    });
+    atualizarPreviaSeo();
+  }
+
+  // Mostra como o texto vai aparecer na busca, com os limites em que o
+  // Google costuma cortar: ~60 caracteres no título e ~160 na descrição.
+  function atualizarPreviaSeo() {
+    var titulo = (document.getElementById('seoTitulo') || {}).value || '';
+    var desc = (document.getElementById('seoDescricao') || {}).value || '';
+
+    setText('seoPreviewTitulo', titulo || 'Sem título definido');
+    setText('seoPreviewDesc', desc || 'Sem descrição definida');
+
+    var marcar = function(id, n, limite) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = '(' + n + '/' + limite + ')';
+      el.style.color = n > limite ? 'var(--orange)' : 'var(--text-faint)';
+      el.title = n > limite ? 'O Google provavelmente vai cortar o final' : '';
+    };
+    marcar('seoContaTitulo', titulo.length, 60);
+    marcar('seoContaDesc', desc.length, 160);
+  }
+
+  async function salvarSeo() {
+    var msg = document.getElementById('seoMsg');
+    var aviso = function(texto, cor) { if (msg) { msg.style.color = cor; msg.textContent = texto; } };
+
+    var titulo = (document.getElementById('seoTitulo') || {}).value.trim();
+    var desc = (document.getElementById('seoDescricao') || {}).value.trim();
+    if (!titulo) { aviso('Escreva um título', 'var(--red)'); return; }
+    if (!desc) { aviso('Escreva uma descrição', 'var(--red)'); return; }
+
+    aviso('Salvando...', 'var(--text-dim)');
+    try {
+      for (var i = 0; i < CAMPOS_SEO.length; i++) {
+        var c = CAMPOS_SEO[i];
+        var el = document.getElementById(c.id);
+        var upd = await sb.from('configuracoes')
+          .update({ valor: el ? el.value.trim() : '', atualizado_em: new Date().toISOString() })
+          .eq('chave', c.chave);
+        if (upd.error) throw upd.error;
+      }
+      aviso('✓ Salvo. Entra no ar na próxima publicação do site.', 'var(--green)');
+      toast('Textos de SEO salvos', 'green');
+    } catch (e) {
+      console.error(e);
+      aviso('Erro ao salvar: ' + (e.message || e), 'var(--red)');
+    }
   }
 
   // ============================================
