@@ -580,12 +580,12 @@
       .form-modal-grid { grid-template-columns: 1fr; }
     }
     .form-actions {
-      display: flex; gap: 12px;
+      display: flex; gap: 12px; flex-wrap: wrap;
       margin-top: 24px;
       padding-top: 24px;
       border-top: 1px solid var(--line-soft);
     }
-    .form-actions .btn { flex: 1; }
+    .form-actions .btn { flex: 1; min-width: 180px; }
     .form-group select,
     .form-group textarea {
       width: 100%;
@@ -2094,7 +2094,8 @@
       </div>
 
       <div class="form-actions">
-        <a id="mWaLink" target="_blank" rel="noopener" class="btn btn-gold">Abrir WhatsApp</a>
+        <button class="btn btn-gold" onclick="enviarResumoWhatsApp()">📲 Enviar resumo</button>
+        <a id="mWaLink" target="_blank" rel="noopener" class="btn btn-ghost">Abrir conversa</a>
         <button class="btn btn-ghost" onclick="closeModal('orderModal')">Fechar</button>
       </div>
     </div>
@@ -2315,9 +2316,12 @@
         <div class="items-list">
           <h5>Mandar para o cliente</h5>
           <div class="pm-envio-acoes">
-            <button class="btn btn-gold" onclick="pmEnviarWhatsApp()">📲 Enviar no WhatsApp</button>
+            <button class="btn btn-gold" onclick="pmEnviarWhatsApp()">📲 Enviar com a cobrança</button>
             <button class="btn btn-ghost" id="pmBtnEmail" onclick="pmEnviarEmail()">✉ Enviar e-mail</button>
           </div>
+          <button class="btn btn-ghost" style="width:100%;margin-top:12px;" onclick="pmEnviarResumo()">
+            📋 Mandar só o resumo, sem cobrança
+          </button>
           <div id="pmEnvioMsg" style="font-size:11px;color:var(--text-faint);margin-top:12px;line-height:1.6;"></div>
         </div>
 
@@ -4175,6 +4179,104 @@
       showToast('Erro ao salvar: ' + (e.message || e), true);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '✓ Salvar alterações'; }
+    }
+  }
+
+  // ============================================
+  // RESUMO DO PEDIDO PARA O CLIENTE
+  // --------------------------------------------
+  // Duas versões do mesmo texto: uma só para o cliente conferir os itens
+  // e o valor, outra com a cobrança Pix junto. O texto é montado num
+  // lugar só — duas cópias divergiriam com o tempo e o cliente acabaria
+  // recebendo um resumo diferente do que foi cobrado.
+  //
+  // Serve para qualquer pedido, venha do site, do PDV ou do manual.
+  // ============================================
+  function resumoPedidoTexto(o, opts) {
+    if (!o) return '';
+    opts = opts || {};
+
+    // O pedido recém-criado volta do insert sem os itens; a versão que
+    // está em `allOrders` já passou pelo loadOrders e tem tudo.
+    var p = (allOrders || []).find(function(x) { return x.id === o.id; }) || o;
+    var itens = getItensDoPedidoAdmin(p);
+    var frete = num(p.frete);
+    var desconto = getDescontoPedido(p);
+
+    var nome = String(p.cliente_nome || '').trim();
+    var primeiro = nome.split(/\s+/)[0] || nome;
+
+    var linhas = [];
+    linhas.push(opts.cobranca
+      ? 'Olá, ' + primeiro + '! Seu pedido está montado 🛍'
+      : 'Olá, ' + primeiro + '! Montei seu pedido aqui, dá uma conferida 🛍');
+    linhas.push('');
+    linhas.push('*Pedido #' + p.numero + '*');
+
+    var subtotal = 0;
+    itens.forEach(function(i) {
+      var qtd = Number(i.quantidade || i.qtd || 1);
+      var valor = num(i.subtotal || ((i.preco_unitario || i.preco || 0) * qtd));
+      subtotal += valor;
+      linhas.push('• ' + qtd + 'x ' + (i.produto_nome || i.nome || 'Produto') + ' — ' + fmt(valor));
+    });
+    linhas.push('');
+
+    // Subtotal só aparece quando há frete ou desconto. Sem eles ele seria
+    // igual ao total, e repetir o mesmo número confunde quem está lendo.
+    if (frete > 0 || desconto > 0) linhas.push('Subtotal: ' + fmt(subtotal));
+    if (frete > 0) linhas.push('Frete: ' + fmt(frete));
+    if (desconto > 0) linhas.push('Desconto: -' + fmt(desconto));
+    linhas.push('*Total: ' + fmt(p.total) + '*');
+    linhas.push('');
+
+    if (p.tipo_entrega === 'retirada') {
+      linhas.push('Retirada na loja.');
+    } else if (p.cliente_endereco) {
+      linhas.push('Entrega em: ' + p.cliente_endereco);
+    }
+
+    if (opts.cobranca) {
+      if (opts.pixCodigo) {
+        linhas.push('');
+        linhas.push('*Pagamento por Pix* (copie o código abaixo e cole no app do seu banco):');
+        linhas.push('');
+        linhas.push(opts.pixCodigo);
+        linhas.push('');
+        linhas.push('Assim que o pagamento cair eu já separo tudo. Se puder, me manda o comprovante por aqui 🙏');
+      } else {
+        linhas.push('');
+        linhas.push('Me confirma que eu te passo os dados para o pagamento.');
+      }
+    } else {
+      linhas.push('');
+      linhas.push('Está tudo certo? Me confirma que eu já separo 😊');
+    }
+
+    return linhas.join('\n');
+  }
+
+  // O número guardado pode ou não já trazer o 55 do país; repetir daria 5555.
+  function linkWhatsApp(whatsapp, texto) {
+    var w = String(whatsapp || '').replace(/\D/g, '');
+    if (w.length < 10) return '';
+    if (w.length <= 11) w = '55' + w;
+    return 'https://wa.me/' + w + '?text=' + encodeURIComponent(texto);
+  }
+
+  function abrirWhatsAppCom(whatsapp, texto) {
+    var url = linkWhatsApp(whatsapp, texto);
+    if (!url) { showToast('Este pedido não tem um WhatsApp válido', true); return false; }
+    window.open(url, '_blank', 'noopener');
+    return true;
+  }
+
+  // Resumo sem cobrança, a partir de qualquer pedido aberto na tela.
+  function enviarResumoWhatsApp() {
+    var o = pedidoAtualModal();
+    if (!o) return;
+    if (abrirWhatsAppCom(o.cliente_whatsapp, resumoPedidoTexto(o, { cobranca: false }))) {
+      showToast('WhatsApp aberto com o resumo ✓');
     }
   }
 
@@ -6852,56 +6954,31 @@
     }
   }
 
-  // A mensagem que vai para a conversa. Texto puro, com o resumo e o
-  // código Pix — o cliente copia direto dali e paga no app do banco.
+  // A mensagem com a cobrança: o mesmo resumo, mais o código Pix, que o
+  // cliente copia direto da conversa e cola no app do banco.
   function pmMensagemWhatsApp() {
     var o = pedidoManual && pedidoManual.criado;
     if (!o) return '';
-    var t = pedidoManual.totais || { frete: Number(o.frete), desconto: 0 };
-
-    var linhas = [];
-    linhas.push('Olá, ' + o.cliente_nome + '! Seu pedido está montado 🛍');
-    linhas.push('');
-    linhas.push('*Pedido #' + o.numero + '*');
-    pedidoManual.itens.forEach(function(i) {
-      linhas.push('• ' + i.quantidade + 'x ' + i.produto_nome + ' — ' + fmt(i.quantidade * i.preco_unitario));
-    });
-    linhas.push('');
-    if (Number(t.frete) > 0) linhas.push('Frete: ' + fmt(t.frete));
-    if (Number(t.desconto) > 0) linhas.push('Desconto: -' + fmt(t.desconto));
-    linhas.push('*Total: ' + fmt(o.total) + '*');
-    linhas.push('');
-
-    if (o.tipo_entrega === 'retirada') {
-      linhas.push('Retirada na loja.');
-    } else if (o.cliente_endereco) {
-      linhas.push('Entrega em: ' + o.cliente_endereco);
-    }
-
-    if (pedidoManual.pixCodigo) {
-      linhas.push('');
-      linhas.push('*Pagamento por Pix* (copie o código abaixo e cole no app do seu banco):');
-      linhas.push('');
-      linhas.push(pedidoManual.pixCodigo);
-      linhas.push('');
-      linhas.push('Assim que o pagamento cair eu já separo tudo. Se puder, me manda o comprovante por aqui 🙏');
-    } else {
-      linhas.push('');
-      linhas.push('Me confirma que eu te passo os dados para o pagamento.');
-    }
-
-    return linhas.join('\n');
+    return resumoPedidoTexto(o, { cobranca: true, pixCodigo: pedidoManual.pixCodigo });
   }
 
   function pmEnviarWhatsApp() {
     var o = pedidoManual && pedidoManual.criado;
     if (!o) return;
-    var w = String(o.cliente_whatsapp || '').replace(/\D/g, '');
-    if (!w) { showToast('Este pedido não tem WhatsApp', true); return; }
-    // O número já pode vir com o 55 do cadastro; repetir daria 5555.
-    if (w.length <= 11) w = '55' + w;
-    window.open('https://wa.me/' + w + '?text=' + encodeURIComponent(pmMensagemWhatsApp()), '_blank', 'noopener');
-    setHTML('pmEnvioMsg', '✓ WhatsApp aberto com a mensagem pronta. Só apertar enviar.');
+    if (abrirWhatsAppCom(o.cliente_whatsapp, pmMensagemWhatsApp())) {
+      setHTML('pmEnvioMsg', '✓ WhatsApp aberto com a mensagem pronta. Só apertar enviar.');
+    }
+  }
+
+  // Mandar antes o resumo sem cobrança: o cliente confere os itens e o
+  // valor, e só depois recebe o Pix.
+  function pmEnviarResumo() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return;
+    if (abrirWhatsAppCom(o.cliente_whatsapp, resumoPedidoTexto(o, { cobranca: false }))) {
+      setHTML('pmEnvioMsg',
+        '✓ WhatsApp aberto com o resumo, sem a cobrança. Quando ele confirmar, use <strong>“Enviar com a cobrança”</strong> para mandar o Pix.');
+    }
   }
 
   function pmCopiarPix() {
