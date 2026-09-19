@@ -2072,6 +2072,26 @@
         </div>
       </div>
 
+      <!-- COBRANÇA PIX — só para pedido que ainda não foi quitado -->
+      <div class="items-list" id="mBlocoPix" style="display:none;">
+        <h5>Cobrança por Pix</h5>
+        <div class="pm-pix-box" id="mPixPronto">
+          <div class="pm-pix-qr" id="mPixQr"></div>
+          <div class="pm-pix-dados">
+            <div class="mono" style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);margin-bottom:6px;">PIX COPIA E COLA</div>
+            <textarea class="pm-pix-codigo" id="mPixCodigo" readonly onclick="this.select()"></textarea>
+            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn-mini gold" onclick="copiarPixPedido()">📋 Copiar código Pix</button>
+              <span class="mono" style="font-size:10px;color:var(--text-faint);align-self:center;" id="mPixValor"></span>
+            </div>
+          </div>
+        </div>
+        <div class="pm-aviso" id="mPixAviso" style="display:none;margin-bottom:0;"></div>
+        <button class="btn btn-gold" id="mBtnCobranca" style="width:100%;margin-top:16px;" onclick="enviarCobrancaWhatsApp()">
+          ◆ Enviar cobrança no WhatsApp
+        </button>
+      </div>
+
       <!-- PEDIDOS ANTERIORES DO CLIENTE -->
       <div class="items-list">
         <h5 style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
@@ -3819,6 +3839,8 @@
     }
     document.getElementById('mTotal').textContent = fmt(o.total);
 
+    renderCobrancaPedido(o);
+
     // Histórico de pedidos anteriores do mesmo cliente.
     renderHistoricoNoPedido(o);
 
@@ -3868,6 +3890,9 @@
       var o = allOrders.find(function(x) { return x.id === id; });
       if (o) o.status = status;
       renderOrders();
+      // Marcou como pago: a cobrança some da tela na hora. Deixá-la ali
+      // é convite a cobrar o cliente duas vezes.
+      renderCobrancaPedido(o);
       // Atualizar botões no modal
       document.querySelectorAll('[data-mstatus]').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.mstatus === status);
@@ -3920,6 +3945,10 @@
     // mesmo número na mesma tela é pedido errado na certa.
     var freteRowEditar = document.getElementById('mFreteRow');
     if (freteRowEditar) freteRowEditar.style.display = 'none';
+    // Durante a edição o total ainda vai mudar; um QR do valor antigo
+    // cobraria o cliente errado.
+    var pixEditar = document.getElementById('mBlocoPix');
+    if (pixEditar) pixEditar.style.display = 'none';
     var compEditar = document.getElementById('mComposicao');
     if (compEditar) compEditar.style.display = 'none';
     document.getElementById('mItensEdit').style.display = 'block';
@@ -3933,6 +3962,10 @@
   }
 
   function sairModoEdicao() {
+    // openOrderDetail chama esta função em toda abertura, para garantir o
+    // modo leitura. Sem saber se havia edição em curso, a cobrança seria
+    // montada duas vezes por abertura — e o QR piscaria na tela.
+    var estavaEditando = !!pedidoEdicao;
     pedidoEdicao = null;
     var box = document.getElementById('addProdutoBox');
     if (box) box.style.display = 'none';
@@ -3940,6 +3973,8 @@
     document.getElementById('mTotalRow').style.display = '';
     var freteRowLeitura = document.getElementById('mFreteRow');
     if (freteRowLeitura) freteRowLeitura.style.display = '';
+    // Quem decide se a cobrança volta é o status do pedido.
+    if (estavaEditando) renderCobrancaPedido(pedidoAtualModal());
     var compLeitura = document.getElementById('mComposicao');
     if (compLeitura) compLeitura.style.display = '';
     document.getElementById('mItensEdit').style.display = 'none';
@@ -4277,6 +4312,97 @@
     if (!o) return;
     if (abrirWhatsAppCom(o.cliente_whatsapp, resumoPedidoTexto(o, { cobranca: false }))) {
       showToast('WhatsApp aberto com o resumo ✓');
+    }
+  }
+
+  // --------------------------------------------
+  // COBRANÇA PIX DE UM PEDIDO JÁ EXISTENTE
+  // --------------------------------------------
+  // O Pix só saía do pedido manual recém-criado. Quem duplicava um
+  // pedido, mandava o resumo e ouvia "pode ser" não tinha como cobrar
+  // sem refazer tudo. Agora a cobrança sai de qualquer pedido aberto.
+  //
+  // Pedido já quitado não mostra cobrança: um QR de pagamento num pedido
+  // entregue é convite a cobrar o cliente duas vezes.
+  var STATUS_QUITADO = ['pago', 'enviado', 'entregue', 'cancelado'];
+  var pixPedidoAtual = '';
+
+  function renderCobrancaPedido(o) {
+    var bloco = document.getElementById('mBlocoPix');
+    if (!bloco) return;
+
+    pixPedidoAtual = '';
+
+    if (!o || STATUS_QUITADO.indexOf(o.status) >= 0) {
+      bloco.style.display = 'none';
+      return;
+    }
+    bloco.style.display = '';
+
+    var pronto = document.getElementById('mPixPronto');
+    var aviso = document.getElementById('mPixAviso');
+    var botao = document.getElementById('mBtnCobranca');
+
+    var codigo = gerarPixCopiaECola({
+      chave: pixConfig.chave,
+      nome: pixConfig.nome,
+      cidade: pixConfig.cidade,
+      valor: num(o.total),
+      txid: String(o.numero || '').replace(/[^A-Za-z0-9]/g, '')
+    });
+    pixPedidoAtual = codigo;
+
+    if (!codigo) {
+      // Sem chave configurada a cobrança ainda vai — só sem o código.
+      // Melhor isso do que mandar ao cliente algo que o banco recusa.
+      pronto.style.display = 'none';
+      aviso.style.display = '';
+      setHTML('mPixAviso', pixConfig.chave
+        ? 'Falta o nome do recebedor ou a cidade para montar o código Pix. Preencha em <strong>Config → Pix</strong>.'
+        : 'Nenhuma chave Pix configurada. Preencha em <strong>Config → Pix</strong> e o código passa a sair pronto aqui.');
+      botao.textContent = '◆ Enviar cobrança (sem código Pix)';
+      return;
+    }
+
+    pronto.style.display = '';
+    aviso.style.display = 'none';
+    botao.textContent = '◆ Enviar cobrança no WhatsApp';
+    document.getElementById('mPixCodigo').value = codigo;
+    setText('mPixValor', fmt(o.total));
+
+    var caixaQr = document.getElementById('mPixQr');
+    caixaQr.innerHTML = '';
+    caixaQr.style.display = '';
+    if (window.QRCode && QRCode.toCanvas) {
+      var canvas = document.createElement('canvas');
+      caixaQr.appendChild(canvas);
+      QRCode.toCanvas(canvas, codigo, { width: 148, margin: 1 }, function(err) {
+        // Sem QR a cobrança continua de pé: o que vai pelo WhatsApp é o
+        // "copia e cola", não a imagem.
+        if (err) { console.warn('QR do Pix:', err); caixaQr.style.display = 'none'; }
+      });
+    } else {
+      caixaQr.style.display = 'none';
+    }
+  }
+
+  function copiarPixPedido() {
+    if (!pixPedidoAtual) return;
+    navigator.clipboard.writeText(pixPedidoAtual)
+      .then(function() { toast('✓ Código Pix copiado!', 'green'); })
+      .catch(function() {
+        var el = document.getElementById('mPixCodigo');
+        if (el) el.select();
+        toast('Selecione e copie o código', 'red');
+      });
+  }
+
+  function enviarCobrancaWhatsApp() {
+    var o = pedidoAtualModal();
+    if (!o) return;
+    var texto = resumoPedidoTexto(o, { cobranca: true, pixCodigo: pixPedidoAtual });
+    if (abrirWhatsAppCom(o.cliente_whatsapp, texto)) {
+      showToast(pixPedidoAtual ? 'WhatsApp aberto com a cobrança ✓' : 'WhatsApp aberto (sem código Pix)');
     }
   }
 
