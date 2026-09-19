@@ -788,6 +788,82 @@
     }
 
     /* ============================================
+       PEDIDO MANUAL
+       ============================================ */
+    .pm-campos {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 600px) {
+      .pm-campos { grid-template-columns: 1fr; }
+    }
+    .pm-campos label,
+    .pm-linha label {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 4px;
+    }
+    .pm-campos input,
+    .pm-linha input,
+    .pm-linha select,
+    .pm-linha textarea {
+      width: 100%;
+      background: var(--bg-soft); border: 1px solid var(--line);
+      color: var(--text); padding: 10px; font-size: 13px;
+    }
+    .pm-campos input:focus,
+    .pm-linha input:focus,
+    .pm-linha select:focus,
+    .pm-linha textarea:focus { outline: none; border-color: var(--gold); }
+    .pm-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) {
+      .pm-linha { grid-template-columns: 1fr; }
+    }
+    /* O "copia e cola" do Pix é um bloco só de código: precisa quebrar em
+       qualquer ponto, senão estoura a largura do modal no celular. */
+    .pm-pix-codigo {
+      width: 100%;
+      background: var(--bg); border: 1px solid var(--line);
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      line-height: 1.5; padding: 10px;
+      word-break: break-all; resize: vertical;
+      min-height: 76px;
+    }
+    .pm-pix-box {
+      display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
+    }
+    .pm-pix-qr {
+      background: #fff; padding: 8px; line-height: 0;
+      flex-shrink: 0;
+    }
+    .pm-pix-dados { flex: 1; min-width: 220px; }
+    .pm-aviso {
+      border: 1px solid var(--line); border-left: 2px solid var(--gold);
+      background: var(--bg); padding: 12px 14px;
+      font-size: 12px; line-height: 1.6; color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+    .pm-sucesso {
+      border: 1px solid var(--green);
+      background: rgba(74,222,128,0.08);
+      padding: 16px; margin-bottom: 20px;
+      text-align: center;
+    }
+    .pm-sucesso strong {
+      display: block;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px; color: var(--green); font-weight: 500;
+    }
+    .pm-envio-acoes {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    @media (max-width: 600px) {
+      .pm-envio-acoes { grid-template-columns: 1fr; }
+    }
+
+    /* ============================================
        EDIÇÃO DE ITENS DO PEDIDO
        ============================================ */
     .edit-item {
@@ -1034,6 +1110,7 @@
             <option value="todos">Todos os canais</option>
             <option value="pdv">⭐ Club Alpha PDV</option>
             <option value="site">🌐 Site Online</option>
+            <option value="manual">★ Manual (WhatsApp)</option>
           </select>
           <input type="text" class="search-input" placeholder="Buscar por nome, número ou WhatsApp..." id="searchInput" oninput="filterSearch()" style="flex:1;min-width:200px;" />
         </div>
@@ -1459,7 +1536,8 @@
           <h2 class="page-title">Lista de <em>clientes</em></h2>
           <div class="page-actions" style="display:flex;gap:8px;">
             <button class="btn-mini" onclick="loadClients()">↻ ATUALIZAR</button>
-            <button class="btn-mini gold" onclick="exportarClientesCSV()">⬇ EXPORTAR CSV</button>
+            <button class="btn-mini gold" onclick="abrirPedidoManual()">★ NOVO PEDIDO MANUAL</button>
+            <button class="btn-mini" onclick="exportarClientesCSV()">⬇ EXPORTAR CSV</button>
           </div>
         </div>
 
@@ -1564,7 +1642,7 @@
               </div>
               <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);">
                 <span style="font-size:11px;color:var(--text-dim);">Chave Pix</span>
-                <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text);">11942920076</span>
+                <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text);" id="infoPixChave">—</span>
               </div>
               <div style="display:flex;justify-content:space-between;padding:8px 0;">
                 <span style="font-size:11px;color:var(--text-dim);">WhatsApp</span>
@@ -1572,6 +1650,47 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- PIX DA LOJA -->
+        <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">◆ PIX — COBRANÇA DOS PEDIDOS MANUAIS</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-bottom:18px;line-height:1.6;">
+            É esta chave que entra no "copia e cola" e no QR Code enviados ao cliente pelo WhatsApp.
+            <strong style="color:var(--text-dim);">Confira antes de usar:</strong> chave errada é dinheiro caindo na conta de outra pessoa.
+            O nome e a cidade são exigidos pelo padrão do Banco Central e aparecem no app do banco do cliente.
+          </div>
+
+          <div class="pm-linha" style="margin-bottom:12px;">
+            <div>
+              <label>CHAVE PIX</label>
+              <input id="lojaPixChave" oninput="atualizarPreviaPix()" placeholder="CPF, telefone, e-mail ou chave aleatória"
+                style="font-family:'JetBrains Mono',monospace;" />
+            </div>
+            <div>
+              <label>NOME DO RECEBEDOR <span style="color:var(--text-faint);">(até 25, sem acento)</span></label>
+              <input id="lojaPixNome" oninput="atualizarPreviaPix()" placeholder="ALPHA GALERIE" maxlength="25" />
+            </div>
+          </div>
+
+          <div class="pm-linha" style="margin-bottom:16px;">
+            <div>
+              <label>CIDADE <span style="color:var(--text-faint);">(até 15, sem acento)</span></label>
+              <input id="lojaPixCidade" oninput="atualizarPreviaPix()" placeholder="BARUERI" maxlength="15" />
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <button onclick="salvarPix()" style="width:100%;background:var(--gold);color:#000;border:none;padding:12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">SALVAR PIX</button>
+            </div>
+          </div>
+
+          <div style="background:var(--bg);border:1px solid var(--line);padding:14px;">
+            <div class="mono" style="font-size:9px;color:var(--text-faint);margin-bottom:8px;">TESTE: COMO FICA UMA COBRANÇA DE R$ 1,00</div>
+            <div id="lojaPixPrevia" style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;word-break:break-all;line-height:1.5;">—</div>
+            <div style="font-size:10px;color:var(--text-faint);margin-top:8px;line-height:1.5;">
+              Vale conferir uma vez: copie este código, cole no app do seu banco e veja se o recebedor aparece certo.
+            </div>
+          </div>
+          <div id="pixMsg" style="font-size:11px;margin-top:10px;"></div>
         </div>
 
         <!-- ENDEREÇO E CONTATO DA LOJA -->
@@ -2009,8 +2128,166 @@
       </div>
 
       <div class="form-actions">
-        <a id="cmWaLink" target="_blank" rel="noopener" class="btn btn-gold">Abrir WhatsApp</a>
+        <button class="btn btn-gold" id="cmBtnPedido" onclick="abrirPedidoManual(cmChaveAtual)">★ Fazer pedido manual</button>
+        <a id="cmWaLink" target="_blank" rel="noopener" class="btn btn-ghost">Abrir WhatsApp</a>
         <button class="btn btn-ghost" onclick="closeModal('clienteModal')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PEDIDO MANUAL MODAL -->
+  <div class="modal" id="pedidoManualModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3>Pedido <em>manual</em></h3>
+          <div class="order-num" id="pmSub">Para quem pediu pelo WhatsApp</div>
+        </div>
+        <button class="modal-close" onclick="fecharPedidoManual()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- ETAPA 1 — MONTAR O PEDIDO -->
+      <div id="pmEtapaMontar">
+        <div class="items-list">
+          <h5>Dados do cliente</h5>
+          <div class="pm-campos">
+            <div>
+              <label>NOME *</label>
+              <input id="pmNome" placeholder="Nome do cliente" />
+            </div>
+            <div>
+              <label>WHATSAPP *</label>
+              <input id="pmWhats" placeholder="(11) 90000-0000" oninput="pmAtualizarAvisoContato()" />
+            </div>
+            <div>
+              <label>E-MAIL <span style="color:var(--text-faint);">(para o aviso do pedido)</span></label>
+              <input id="pmEmail" placeholder="cliente@email.com" oninput="pmAtualizarAvisoContato()" />
+            </div>
+            <div>
+              <label>ENDEREÇO DE ENTREGA</label>
+              <input id="pmEndereco" placeholder="Rua, número, bairro" />
+            </div>
+          </div>
+          <div id="pmAvisoContato" style="font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;"></div>
+        </div>
+
+        <div class="items-list">
+          <h5>Itens do pedido</h5>
+
+          <div class="edit-item" style="border-bottom:1px solid var(--line);padding-bottom:8px;">
+            <div class="mono" style="color:var(--text-faint);font-size:9px;">Produto</div>
+            <div class="mono" style="color:var(--text-faint);font-size:9px;">Qtd</div>
+            <div class="mono" style="color:var(--text-faint);font-size:9px;">Unitário</div>
+            <div class="mono" style="color:var(--text-faint);font-size:9px;text-align:right;">Subtotal</div>
+            <div></div>
+          </div>
+          <div id="pmItensLista"></div>
+
+          <div style="margin-top:14px;">
+            <button class="btn-mini gold" onclick="pmToggleProduto()">+ Adicionar produto</button>
+            <button class="btn-mini" onclick="pmAdicionarItemLivre()">+ Item avulso</button>
+            <div id="pmAddProdutoBox" style="display:none;margin-top:10px;">
+              <input type="text" id="pmProdSearch" class="search-input" placeholder="Buscar produto por nome, código ou marca..." oninput="renderPmPicker()" style="width:100%;max-width:none;" />
+              <div class="prod-pick" id="pmProdutoPicker"></div>
+            </div>
+          </div>
+
+          <div class="totais-box">
+            <div class="totais-row">
+              <span class="lbl">Subtotal dos itens</span>
+              <span class="val mono" id="pmSubtotal">R$ 0,00</span>
+            </div>
+            <div class="totais-row">
+              <span class="lbl">Frete</span>
+              <input type="number" step="0.01" min="0" id="pmFrete" value="0" oninput="pmRecalcular()" />
+            </div>
+            <div class="totais-row">
+              <span class="lbl">Desconto</span>
+              <input type="number" step="0.01" min="0" id="pmDesconto" value="0" oninput="pmRecalcular()" />
+            </div>
+            <div class="totais-row grand">
+              <span class="lbl">Total a cobrar</span>
+              <span class="val" id="pmTotal">R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="items-list">
+          <h5>Pagamento e entrega</h5>
+          <div class="pm-linha" style="margin-bottom:12px;">
+            <div>
+              <label>FORMA DE PAGAMENTO</label>
+              <select id="pmPagamento">
+                <option value="pix">Pix</option>
+                <option value="cartao">Cartão</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="pagar_retirada">Pagar na retirada</option>
+              </select>
+            </div>
+            <div>
+              <label>ENTREGA</label>
+              <select id="pmEntrega">
+                <option value="entrega">Entrega</option>
+                <option value="retirada">Retirada na loja</option>
+              </select>
+            </div>
+          </div>
+          <div class="pm-linha" style="grid-template-columns:1fr;">
+            <div>
+              <label>OBSERVAÇÕES <span style="color:var(--text-faint);">(só você vê)</span></label>
+              <textarea id="pmObs" rows="2" placeholder="Ex.: combinado de entregar sábado de manhã"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-gold" id="pmBtnCriar" onclick="criarPedidoManual()">✓ Criar pedido e gerar cobrança</button>
+          <button class="btn btn-ghost" onclick="fecharPedidoManual()">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- ETAPA 2 — ENVIAR AO CLIENTE -->
+      <div id="pmEtapaEnviar" style="display:none;">
+        <div class="pm-sucesso">
+          <strong id="pmNumeroCriado">—</strong>
+          <span style="font-size:12px;color:var(--text-dim);">Pedido criado e já aguardando o pagamento</span>
+        </div>
+
+        <div class="items-list" id="pmBlocoPix">
+          <h5>Cobrança por Pix</h5>
+          <div class="pm-pix-box">
+            <div class="pm-pix-qr" id="pmPixQr"></div>
+            <div class="pm-pix-dados">
+              <div class="mono" style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);margin-bottom:6px;">PIX COPIA E COLA</div>
+              <textarea class="pm-pix-codigo" id="pmPixCodigo" readonly onclick="this.select()"></textarea>
+              <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn-mini gold" onclick="pmCopiarPix()">📋 Copiar código Pix</button>
+                <span class="mono" style="font-size:10px;color:var(--text-faint);align-self:center;" id="pmPixValor"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="items-list" id="pmBlocoSemPix" style="display:none;">
+          <h5>Cobrança por Pix</h5>
+          <div class="pm-aviso" style="margin-bottom:0;" id="pmSemPixTexto"></div>
+        </div>
+
+        <div class="items-list">
+          <h5>Mandar para o cliente</h5>
+          <div class="pm-envio-acoes">
+            <button class="btn btn-gold" onclick="pmEnviarWhatsApp()">📲 Enviar no WhatsApp</button>
+            <button class="btn btn-ghost" id="pmBtnEmail" onclick="pmEnviarEmail()">✉ Enviar e-mail</button>
+          </div>
+          <div id="pmEnvioMsg" style="font-size:11px;color:var(--text-faint);margin-top:12px;line-height:1.6;"></div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="pmAbrirPedidoCriado()">Abrir o pedido</button>
+          <button class="btn btn-ghost" onclick="fecharPedidoManual()">Fechar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2425,6 +2702,10 @@
     // Carrega categorias antes dos produtos para que o relacionamento/filtros funcionem corretamente.
     await loadCategories();
     await Promise.all([loadOrders(), loadClients()]);
+    // A chave Pix é o que monta a cobrança do pedido manual. Sem isso,
+    // quem nunca abriu a aba Config cairia na tela "Pix não configurado"
+    // mesmo com a chave gravada.
+    try { await carregarPix(); } catch (e) { console.warn('Pix:', e); }
     montarIndiceClientes();
     renderStats();
     try { renderPerformance(); } catch (e) { console.warn('Performance:', e); }
@@ -2581,7 +2862,7 @@
 
   // Marcadores técnicos gravados em `observacoes` (o schema não tem coluna
   // própria para eles). Não devem aparecer para o operador.
-  var MARCADORES_OBS = ['ITENS_ADMIN_JSON=', 'DESCONTO_ADMIN=', 'EDITADO_ADMIN='];
+  var MARCADORES_OBS = ['ITENS_ADMIN_JSON=', 'DESCONTO_ADMIN=', 'EDITADO_ADMIN=', 'CANAL_ADMIN='];
 
   function limparObservacoes(obs) {
     var txt = String(obs || '');
@@ -2634,6 +2915,10 @@
   }
 
   function getCanal(o) {
+    // O pedido montado à mão não veio do site nem do PDV. Sem um canal
+    // próprio ele cairia em "site" e inflaria justamente o número que
+    // serve para decidir onde vale a pena investir.
+    if (lerMarcador(o && o.observacoes, 'CANAL_ADMIN=') === 'manual') return 'manual';
     var obs = (o.observacoes || '').toLowerCase();
     var num = (o.numero || '').toUpperCase();
     return (num.startsWith('PDV') || obs.includes('pdv') || obs.includes('club alpha')) ? 'pdv' : 'site';
@@ -2692,6 +2977,7 @@
     if (tab === 'configuracoes') {
       carregarCupons();
       carregarLoja();
+      carregarPix();
       carregarSeo();
       renderFuncionarios();
     }
@@ -3237,7 +3523,7 @@
     if (cCanal && !chartCanal) {
       chartCanal = new Chart(cCanal, {
         type: 'doughnut',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(167,139,250,0.85)', 'rgba(96,165,250,0.85)'], borderColor: '#111', borderWidth: 2 }] },
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(167,139,250,0.85)', 'rgba(96,165,250,0.85)', 'rgba(201,169,97,0.85)'], borderColor: '#111', borderWidth: 2 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } }
       });
     }
@@ -3412,7 +3698,9 @@
       var c = getCanal(o);
       var canalBadge = c === 'pdv'
         ? '<span style="background:rgba(167,139,250,0.15);color:#a78bfa;border:1px solid rgba(167,139,250,0.3);padding:2px 7px;font-size:9px;font-family:\'JetBrains Mono\',monospace;">⭐ CLUB ALPHA</span>'
-        : '<span style="background:rgba(96,165,250,0.1);color:#60a5fa;border:1px solid rgba(96,165,250,0.2);padding:2px 7px;font-size:9px;font-family:\'JetBrains Mono\',monospace;">🌐 SITE</span>';
+        : (c === 'manual'
+          ? '<span style="background:rgba(201,169,97,0.12);color:var(--gold);border:1px solid rgba(201,169,97,0.3);padding:2px 7px;font-size:9px;font-family:\'JetBrains Mono\',monospace;">★ MANUAL</span>'
+          : '<span style="background:rgba(96,165,250,0.1);color:#60a5fa;border:1px solid rgba(96,165,250,0.2);padding:2px 7px;font-size:9px;font-family:\'JetBrains Mono\',monospace;">🌐 SITE</span>');
       var pagMap = { pix: '◆ Pix', cartao: '▣ Cartão', dinheiro: '$ Dinheiro', pagar_retirada: '⬡ Retirada' };
       var pag = pagMap[o.forma_pagamento] || o.forma_pagamento || '—';
       return '<tr onclick="openOrderDetail(' + o.id + ')" style="cursor:pointer;">' +
@@ -4729,8 +5017,9 @@
         '<td>' + ultimoTxt + '</td>' +
         '<td><span class="cli-tag ' + tag.cls + '">' + tag.txt + '</span></td>' +
         '<td onclick="event.stopPropagation();">' +
+          '<button class="btn-mini gold" title="Montar um pedido com os dados deste cliente" onclick="abrirPedidoManual(\'' + esc(c.chave) + '\')">★ PEDIDO</button> ' +
           (w ? '<a class="btn-mini" href="https://wa.me/55' + w + '" target="_blank" rel="noopener">WHATSAPP</a> ' : '') +
-          '<button class="btn-mini gold" onclick="openClientDetail(\'' + esc(c.chave) + '\')">VER</button>' +
+          '<button class="btn-mini" onclick="openClientDetail(\'' + esc(c.chave) + '\')">VER</button>' +
         '</td>' +
         '</tr>';
     }).join('');
@@ -4740,6 +5029,7 @@
     var c = clientesIndex.find(function(x) { return x.chave === chave; });
     if (!c) return;
 
+    cmChaveAtual = chave;
     var tag = classificarCliente(c);
     setText('cmNome', c.nome);
     setHTML('cmSub', '<span class="cli-tag ' + tag.cls + '">' + tag.txt + '</span>' +
@@ -5005,17 +5295,19 @@
   function renderCanais(atual) {
     var pdv = atual.faturados.filter(function(o) { return getCanal(o) === 'pdv'; });
     var site = atual.faturados.filter(function(o) { return getCanal(o) === 'site'; });
+    var manual = atual.faturados.filter(function(o) { return getCanal(o) === 'manual'; });
     var vPdv = pdv.reduce(function(s, o) { return s + num(o.total); }, 0);
     var vSite = site.reduce(function(s, o) { return s + num(o.total); }, 0);
+    var vManual = manual.reduce(function(s, o) { return s + num(o.total); }, 0);
 
     ensureCharts();
     if (chartCanal) {
-      chartCanal.data.labels = ['Club Alpha PDV', 'Site Online'];
-      chartCanal.data.datasets[0].data = [Math.round(vPdv), Math.round(vSite)];
+      chartCanal.data.labels = ['Club Alpha PDV', 'Site Online', 'Manual (WhatsApp)'];
+      chartCanal.data.datasets[0].data = [Math.round(vPdv), Math.round(vSite), Math.round(vManual)];
       chartCanal.update();
     }
 
-    var total = vPdv + vSite;
+    var total = vPdv + vSite + vManual;
     var linha = function(nome, valor, qtd, cor) {
       var p = total ? Math.round((valor / total) * 100) : 0;
       return '<div class="rank-row"><div class="rank-pos" style="color:' + cor + ';">■</div>' +
@@ -5024,7 +5316,8 @@
     };
     setHTML('canalResumo',
       linha('⭐ Club Alpha PDV', vPdv, pdv.length, '#a78bfa') +
-      linha('🌐 Site Online', vSite, site.length, '#60a5fa'));
+      linha('🌐 Site Online', vSite, site.length, '#60a5fa') +
+      linha('★ Manual (WhatsApp)', vManual, manual.length, 'var(--gold)'));
   }
 
   function renderPagamentos(atual) {
@@ -5895,6 +6188,654 @@
     document.getElementById('senhaAtual').value = '';
     document.getElementById('senhaNova').value = '';
     document.getElementById('senhaConfirm').value = '';
+  }
+
+  // ============================================
+  // PIX — chave de recebimento da loja
+  // --------------------------------------------
+  // A chave estava escrita à mão no HTML, num painel que só a mostrava.
+  // O pedido manual precisa dela de verdade: é com ela que o "copia e
+  // cola" mandado ao cliente é montado. Chave errada é dinheiro na conta
+  // de outra pessoa, então ela passa a viver na tabela `configuracoes`,
+  // num lugar só, editável sem mexer em código.
+  //
+  // O carregamento é tolerante a falha de propósito: se as linhas ainda
+  // não existirem no banco, a retaguarda continua funcionando e o pedido
+  // manual só deixa de oferecer o Pix, avisando o motivo na tela.
+  // ============================================
+  var pixConfig = { chave: '', nome: '', cidade: '' };
+
+  async function carregarPix() {
+    var res = await sb.from('configuracoes').select('chave,valor')
+      .in('chave', ['loja_pix_chave', 'loja_pix_nome', 'loja_pix_cidade']);
+    if (res.error) {
+      console.warn('Config do Pix:', res.error.message);
+      return;
+    }
+    var mapa = {};
+    (res.data || []).forEach(function(r) { mapa[r.chave] = r.valor; });
+    pixConfig = {
+      chave: mapa.loja_pix_chave || '',
+      nome: mapa.loja_pix_nome || '',
+      cidade: mapa.loja_pix_cidade || ''
+    };
+    var campos = [['lojaPixChave', 'chave'], ['lojaPixNome', 'nome'], ['lojaPixCidade', 'cidade']];
+    campos.forEach(function(c) {
+      var el = document.getElementById(c[0]);
+      if (el) el.value = pixConfig[c[1]];
+    });
+    setText('infoPixChave', pixConfig.chave || 'não configurada');
+    atualizarPreviaPix();
+  }
+
+  function atualizarPreviaPix() {
+    var codigo = gerarPixCopiaECola({
+      chave: valorLoja('lojaPixChave'),
+      nome: valorLoja('lojaPixNome'),
+      cidade: valorLoja('lojaPixCidade'),
+      valor: 1,
+      txid: 'TESTE'
+    });
+    setText('lojaPixPrevia', codigo || 'Preencha a chave, o nome e a cidade para ver o código.');
+  }
+
+  async function salvarPix() {
+    var msg = document.getElementById('pixMsg');
+    var aviso = function(texto, cor) { if (msg) { msg.style.color = cor; msg.textContent = texto; } };
+
+    var chave = valorLoja('lojaPixChave');
+    var nome = valorLoja('lojaPixNome');
+    var cidade = valorLoja('lojaPixCidade');
+
+    if (!chave) { aviso('Preencha a chave Pix', 'var(--red)'); return; }
+    if (!nome) { aviso('Preencha o nome do recebedor', 'var(--red)'); return; }
+    if (!cidade) { aviso('Preencha a cidade', 'var(--red)'); return; }
+    if (!gerarPixCopiaECola({ chave: chave, nome: nome, cidade: cidade, valor: 1, txid: 'TESTE' })) {
+      aviso('Não consegui montar o código com esses dados. Confira a chave.', 'var(--red)');
+      return;
+    }
+
+    aviso('Salvando...', 'var(--text-dim)');
+    try {
+      // upsert, e não update: numa loja que ainda não rodou a migration as
+      // três linhas não existem, e um update nesse caso volta sem erro e
+      // sem ter gravado nada — a tela diria "salvo" e o Pix continuaria
+      // vazio na hora de cobrar.
+      var agora = new Date().toISOString();
+      var up = await sb.from('configuracoes').upsert([
+        { chave: 'loja_pix_chave', valor: chave, atualizado_em: agora },
+        { chave: 'loja_pix_nome', valor: nome, atualizado_em: agora },
+        { chave: 'loja_pix_cidade', valor: cidade, atualizado_em: agora }
+      ], { onConflict: 'chave' }).select('chave');
+      if (up.error) throw up.error;
+      if (!up.data || up.data.length < 3) throw new Error('o banco não confirmou a gravação');
+
+      pixConfig = { chave: chave, nome: nome, cidade: cidade };
+      setText('infoPixChave', chave);
+      aviso('✓ Salvo. Os pedidos manuais já cobram nesta chave.', 'var(--green)');
+      toast('Chave Pix salva', 'green');
+    } catch (e) {
+      console.error(e);
+      aviso('Erro ao salvar: ' + (e.message || e), 'var(--red)');
+    }
+  }
+
+  // --------------------------------------------
+  // PIX COPIA E COLA (BR Code / padrão EMV do Banco Central)
+  // --------------------------------------------
+  // O código que o cliente cola no app do banco é uma sequência de campos
+  // "ID + tamanho + valor", fechada por um CRC16. Dá para montar aqui
+  // mesmo, sem nenhum serviço externo e sem taxa: o banco do cliente lê o
+  // texto e já sabe para quem mandar e quanto.
+
+  // CRC16-CCITT (polinômio 0x1021, início 0xFFFF) — é o que a
+  // especificação do BR Code exige no campo 63.
+  function crc16Pix(str) {
+    var crc = 0xFFFF;
+    for (var i = 0; i < str.length; i++) {
+      crc ^= (str.charCodeAt(i) & 0xFF) << 8;
+      for (var b = 0; b < 8; b++) {
+        crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xFFFF;
+      }
+    }
+    var hex = crc.toString(16).toUpperCase();
+    while (hex.length < 4) hex = '0' + hex;
+    return hex;
+  }
+
+  function campoEmv(id, valor) {
+    var v = String(valor === null || valor === undefined ? '' : valor);
+    var tam = String(v.length);
+    if (tam.length < 2) tam = '0' + tam;
+    return id + tam + v;
+  }
+
+  // O padrão só aceita ASCII nos campos de nome e cidade. "BARUERÍ" ou
+  // "AÇÃO" viram lixo no app do banco, então acento sai antes.
+  function asciiPix(txt, limite) {
+    var s = String(txt || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Za-z0-9 .\-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+    return limite ? s.slice(0, limite) : s;
+  }
+
+  // Devolve o "copia e cola" pronto, ou '' quando falta dado essencial —
+  // é melhor a tela dizer que o Pix não está configurado do que mandar ao
+  // cliente um código que o banco dele recusa.
+  function gerarPixCopiaECola(opts) {
+    var chave = String((opts && opts.chave) || '').trim();
+    var nome = asciiPix(opts && opts.nome, 25);
+    var cidade = asciiPix(opts && opts.cidade, 15);
+    if (!chave || !nome || !cidade) return '';
+
+    // O txid aceita só letras e números, no máximo 25. '***' é o valor
+    // que a especificação reserva para "sem identificador".
+    var txid = asciiPix(opts && opts.txid, 25).replace(/[^A-Z0-9]/g, '');
+    if (!txid) txid = '***';
+
+    var valor = Number((opts && opts.valor) || 0);
+    var campoValor = valor > 0 ? campoEmv('54', valor.toFixed(2)) : '';
+
+    var conta = campoEmv('00', 'br.gov.bcb.pix') + campoEmv('01', chave);
+
+    var payload =
+      campoEmv('00', '01') +
+      campoEmv('26', conta) +
+      campoEmv('52', '0000') +
+      campoEmv('53', '986') +
+      campoValor +
+      campoEmv('58', 'BR') +
+      campoEmv('59', nome) +
+      campoEmv('60', cidade) +
+      campoEmv('62', campoEmv('05', txid));
+
+    // O CRC é calculado sobre o payload já com "6304" no fim.
+    var base = payload + '6304';
+    return base + crc16Pix(base);
+  }
+
+  // ============================================
+  // PEDIDO MANUAL
+  // --------------------------------------------
+  // Tem cliente que insiste em pedir pelo WhatsApp. Sem isto, o pedido
+  // dele ou se perde na conversa ou vira um registro digitado à mão
+  // depois, fora de qualquer relatório. Aqui o pedido nasce igual a um do
+  // site — mesma tabela, mesmo número, entra no faturamento — e sai com
+  // a cobrança Pix pronta para colar na conversa.
+  //
+  // O pedido é criado em `aguardando_pagamento` porque é exatamente essa
+  // a situação: está montado, o cliente ainda não pagou.
+  // ============================================
+  var pedidoManual = null;
+  var cmChaveAtual = null;
+
+  function abrirPedidoManual(chave) {
+    var c = chave ? clientesIndex.find(function(x) { return x.chave === chave; }) : null;
+
+    pedidoManual = { itens: [], cliente: c || null, criado: null, pixCodigo: '' };
+
+    document.getElementById('pmNome').value = c ? (c.nome === '—' ? '' : c.nome) : '';
+    document.getElementById('pmWhats').value = c ? (c.whatsapp || '') : '';
+    document.getElementById('pmEmail').value = c ? (c.email || '') : '';
+    document.getElementById('pmEndereco').value = c ? (c.endereco || '') : '';
+    document.getElementById('pmFrete').value = '0';
+    document.getElementById('pmDesconto').value = '0';
+    document.getElementById('pmPagamento').value = 'pix';
+    document.getElementById('pmEntrega').value = 'entrega';
+    document.getElementById('pmObs').value = '';
+    document.getElementById('pmProdSearch').value = '';
+    document.getElementById('pmAddProdutoBox').style.display = 'none';
+
+    setText('pmSub', c ? 'Cliente já cadastrado · ' + c.qtdPedidos + ' pedido(s) anteriores' : 'Cliente novo');
+
+    document.getElementById('pmEtapaMontar').style.display = 'block';
+    document.getElementById('pmEtapaEnviar').style.display = 'none';
+    setHTML('pmEnvioMsg', '');
+
+    // O catálogo só carrega quando alguém abre a aba de produtos. Quem vem
+    // direto de Clientes ainda não tem lista para escolher.
+    if (!productsLoaded && !productsLoading) loadProducts();
+
+    renderPmItens();
+    pmAtualizarAvisoContato();
+    closeModal('clienteModal');
+    document.getElementById('pedidoManualModal').classList.add('open');
+  }
+
+  function fecharPedidoManual() {
+    // Fechar no meio da montagem perde os itens digitados. Depois de
+    // criado não há o que perder: o pedido já está gravado.
+    if (pedidoManual && !pedidoManual.criado && pedidoManual.itens.length) {
+      if (!confirm('Fechar sem criar o pedido? Os itens montados serão perdidos.')) return;
+    }
+    pedidoManual = null;
+    closeModal('pedidoManualModal');
+  }
+
+  function pmAtualizarAvisoContato() {
+    var whats = String(document.getElementById('pmWhats').value || '').replace(/\D/g, '');
+    var email = String(document.getElementById('pmEmail').value || '').trim();
+    var partes = [];
+    if (whats.length < 10) partes.push('Sem um WhatsApp válido não dá para mandar a cobrança pela conversa.');
+    if (!email) partes.push('Sem e-mail, o aviso do pedido não sai — só o WhatsApp.');
+    setHTML('pmAvisoContato', partes.length ? '⚠ ' + partes.join(' ') : '');
+  }
+
+  function pmToggleProduto() {
+    var box = document.getElementById('pmAddProdutoBox');
+    if (!box) return;
+    var abrir = box.style.display === 'none';
+    box.style.display = abrir ? 'block' : 'none';
+    if (abrir) {
+      if (!productsLoaded && !productsLoading) loadProducts();
+      renderPmPicker();
+      var inp = document.getElementById('pmProdSearch');
+      if (inp) inp.focus();
+    }
+  }
+
+  function renderPmPicker() {
+    var picker = document.getElementById('pmProdutoPicker');
+    if (!picker) return;
+    var termo = (document.getElementById('pmProdSearch') ? document.getElementById('pmProdSearch').value : '').toLowerCase().trim();
+
+    if (!productsLoaded) {
+      picker.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--text-faint);">Carregando catálogo...</div>';
+      return;
+    }
+
+    var lista = allProducts.filter(function(p) {
+      if (!termo) return true;
+      return (p.nome || '').toLowerCase().includes(termo) ||
+             String(p.codigo || '').toLowerCase().includes(termo) ||
+             String(p.codigo_barras || '').toLowerCase().includes(termo) ||
+             (p.marca || '').toLowerCase().includes(termo);
+    }).slice(0, 40);
+
+    picker.innerHTML = lista.length
+      ? lista.map(function(p) {
+          var preco = num(p.preco_pix || p.preco);
+          var semEstoque = p.estoque !== null && p.estoque !== undefined && Number(p.estoque) <= 0;
+          return '<div class="prod-pick-row" onclick="pmAdicionarProduto(' + p.id + ')">' +
+            '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.nome) +
+              '<small style="display:block;color:' + (semEstoque ? 'var(--red)' : 'var(--text-faint)') + ';font-family:\'JetBrains Mono\',monospace;font-size:9px;">' +
+              esc(p.codigo || '—') + ' · estoque ' + (p.estoque === null || p.estoque === undefined ? '—' : p.estoque) + '</small></div>' +
+            '<span class="mono" style="color:var(--gold);">' + fmt(preco) + '</span>' +
+            '</div>';
+        }).join('')
+      : '<div style="padding:12px;font-size:11px;color:var(--text-faint);">Nenhum produto encontrado.</div>';
+  }
+
+  function pmAdicionarProduto(prodId) {
+    if (!pedidoManual) return;
+    var p = allProducts.find(function(x) { return x.id === prodId; });
+    if (!p) return;
+
+    var existente = pedidoManual.itens.find(function(i) { return i.produto_id === p.id; });
+    if (existente) {
+      existente.quantidade += 1;
+    } else {
+      pedidoManual.itens.push({
+        produto_id: p.id,
+        produto_nome: p.nome,
+        produto_codigo: p.codigo || null,
+        variacao_id: null,
+        quantidade: 1,
+        // Preço Pix, que é como a maioria destes pedidos acaba sendo paga.
+        preco_unitario: num(p.preco_pix || p.preco)
+      });
+    }
+    renderPmItens();
+    showToast(p.nome + ' adicionado ✓');
+  }
+
+  function pmAdicionarItemLivre() {
+    if (!pedidoManual) return;
+    var nome = prompt('Nome do item avulso (ex.: taxa, serviço, brinde):');
+    if (!nome) return;
+    var preco = prompt('Valor unitário (R$):', '0');
+    if (preco === null) return;
+    pedidoManual.itens.push({
+      produto_id: null, produto_nome: nome.trim(), produto_codigo: null,
+      variacao_id: null, quantidade: 1, preco_unitario: Math.max(0, num(preco))
+    });
+    renderPmItens();
+  }
+
+  function pmAlterarItem(idx, campo, valor) {
+    if (!pedidoManual || !pedidoManual.itens[idx]) return;
+    var v = num(valor);
+    if (campo === 'quantidade') v = Math.max(1, Math.round(v) || 1);
+    if (campo === 'preco_unitario') v = Math.max(0, v);
+    pedidoManual.itens[idx][campo] = v;
+
+    // Redesenhar a lista inteira tiraria o foco do campo no meio da
+    // digitação; só o subtotal da linha muda.
+    var linhas = document.querySelectorAll('#pmItensLista .edit-item');
+    if (linhas[idx]) {
+      var sub = linhas[idx].querySelector('.edit-sub');
+      if (sub) sub.textContent = fmt(pedidoManual.itens[idx].quantidade * pedidoManual.itens[idx].preco_unitario);
+    }
+    pmRecalcular();
+  }
+
+  function pmRemoverItem(idx) {
+    if (!pedidoManual || !pedidoManual.itens[idx]) return;
+    pedidoManual.itens.splice(idx, 1);
+    renderPmItens();
+  }
+
+  function renderPmItens() {
+    var lista = document.getElementById('pmItensLista');
+    if (!lista || !pedidoManual) return;
+
+    lista.innerHTML = pedidoManual.itens.length
+      ? pedidoManual.itens.map(function(it, idx) {
+          var sub = it.quantidade * it.preco_unitario;
+          return '<div class="edit-item">' +
+            '<div><div style="font-size:13px;">' + esc(it.produto_nome) + '</div>' +
+              (it.produto_codigo ? '<small class="mono" style="color:var(--text-faint);font-size:10px;">cód. ' + esc(it.produto_codigo) + '</small>' : '') + '</div>' +
+            '<input type="number" min="1" step="1" value="' + it.quantidade + '" oninput="pmAlterarItem(' + idx + ',\'quantidade\',this.value)" aria-label="Quantidade" />' +
+            '<input type="number" min="0" step="0.01" value="' + it.preco_unitario.toFixed(2) + '" oninput="pmAlterarItem(' + idx + ',\'preco_unitario\',this.value)" aria-label="Preço unitário" />' +
+            '<div class="edit-sub">' + fmt(sub) + '</div>' +
+            '<button class="icon-btn" title="Remover item" onclick="pmRemoverItem(' + idx + ')">✕</button>' +
+            '</div>';
+        }).join('')
+      : '<div style="color:var(--text-faint);font-size:12px;padding:12px 0;">Nenhum item ainda. Use "+ Adicionar produto" para montar o carrinho.</div>';
+
+    pmRecalcular();
+  }
+
+  function pmTotais() {
+    var subtotal = (pedidoManual ? pedidoManual.itens : []).reduce(function(s, i) {
+      return s + (i.quantidade * i.preco_unitario);
+    }, 0);
+    var frete = Math.max(0, num(document.getElementById('pmFrete') ? document.getElementById('pmFrete').value : 0));
+    var desconto = num(document.getElementById('pmDesconto') ? document.getElementById('pmDesconto').value : 0);
+    desconto = Math.min(Math.max(0, desconto), subtotal + frete);
+    return { subtotal: subtotal, frete: frete, desconto: desconto, total: subtotal + frete - desconto };
+  }
+
+  function pmRecalcular() {
+    var t = pmTotais();
+    setText('pmSubtotal', fmt(t.subtotal));
+    setText('pmTotal', fmt(t.total));
+  }
+
+  async function criarPedidoManual() {
+    if (!pedidoManual) return;
+
+    var nome = String(document.getElementById('pmNome').value || '').trim();
+    var whats = String(document.getElementById('pmWhats').value || '').trim();
+    var email = String(document.getElementById('pmEmail').value || '').trim();
+    var endereco = String(document.getElementById('pmEndereco').value || '').trim();
+    var entrega = document.getElementById('pmEntrega').value;
+
+    if (!nome) { showToast('Preencha o nome do cliente', true); return; }
+    if (String(whats).replace(/\D/g, '').length < 10) { showToast('Preencha um WhatsApp válido', true); return; }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('E-mail parece inválido', true); return; }
+    if (!pedidoManual.itens.length) { showToast('Adicione ao menos um item', true); return; }
+    if (entrega === 'entrega' && !endereco) {
+      if (!confirm('Este pedido é para entrega e está sem endereço. Criar mesmo assim?')) return;
+    }
+
+    var t = pmTotais();
+    if (t.total <= 0 && !confirm('O total ficou em ' + fmt(t.total) + '. Criar mesmo assim?')) return;
+    if (!confirm('Criar o pedido de ' + nome + ' no valor de ' + fmt(t.total) + '?')) return;
+
+    var btn = document.getElementById('pmBtnCriar');
+    if (btn) { btn.disabled = true; btn.textContent = 'CRIANDO...'; }
+
+    try {
+      var numero = gerarNumeroPedido();
+      var obsDigitada = String(document.getElementById('pmObs').value || '').trim();
+      // O marcador identifica a origem nos relatórios: um pedido montado
+      // aqui não veio do site nem do PDV.
+      var obs = 'Pedido manual (WhatsApp)' + (obsDigitada ? ' · ' + obsDigitada : '');
+      obs = gravarMarcador(obs, 'CANAL_ADMIN=', 'manual');
+      if (t.desconto > 0) obs = gravarMarcador(obs, 'DESCONTO_ADMIN=', t.desconto.toFixed(2));
+
+      var ins = await sb.from('pedidos').insert({
+        numero: numero,
+        cliente_id: (pedidoManual.cliente && pedidoManual.cliente.id) || null,
+        cliente_nome: nome,
+        cliente_whatsapp: whats,
+        cliente_email: email || null,
+        cliente_endereco: endereco || null,
+        subtotal: Number(t.subtotal.toFixed(2)),
+        frete: Number(t.frete.toFixed(2)),
+        total: Number(t.total.toFixed(2)),
+        forma_pagamento: document.getElementById('pmPagamento').value,
+        tipo_entrega: entrega,
+        status: 'aguardando_pagamento',
+        observacoes: obs
+      }).select().single();
+      if (ins.error) throw ins.error;
+
+      var novo = ins.data;
+      var linhas = pedidoManual.itens.map(function(i) {
+        return {
+          pedido_id: novo.id,
+          produto_id: i.produto_id,
+          produto_nome: i.produto_nome,
+          produto_codigo: i.produto_codigo,
+          quantidade: i.quantidade,
+          preco_unitario: i.preco_unitario,
+          subtotal: Number((i.quantidade * i.preco_unitario).toFixed(2)),
+          variacao_id: i.variacao_id
+        };
+      });
+      var insItens = await sb.from('pedido_itens').insert(linhas);
+      if (insItens.error) {
+        // Um pedido sem itens é pior do que pedido nenhum: aparece no
+        // faturamento sem nada dentro. Desfaz o cabeçalho e avisa.
+        await sb.from('pedidos').delete().eq('id', novo.id);
+        throw insItens.error;
+      }
+
+      pedidoManual.criado = novo;
+      pedidoManual.totais = t;
+
+      await loadOrders();
+      montarIndiceClientes();
+      renderClients();
+      renderStats();
+
+      pmMontarEnvio();
+      showToast('Pedido #' + numero + ' criado ✓');
+    } catch (e) {
+      console.error('Erro ao criar pedido manual:', e);
+      showToast('Erro ao criar: ' + (e.message || e), true);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✓ Criar pedido e gerar cobrança'; }
+    }
+  }
+
+  // Troca a tela do modal para o passo de enviar: código Pix, QR e os
+  // botões de WhatsApp e e-mail.
+  function pmMontarEnvio() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return;
+
+    document.getElementById('pmEtapaMontar').style.display = 'none';
+    document.getElementById('pmEtapaEnviar').style.display = 'block';
+    setText('pmNumeroCriado', 'Pedido #' + o.numero);
+    setText('pmSub', fmt(o.total) + ' · ' + o.cliente_nome);
+
+    var codigo = gerarPixCopiaECola({
+      chave: pixConfig.chave,
+      nome: pixConfig.nome,
+      cidade: pixConfig.cidade,
+      valor: Number(o.total),
+      txid: String(o.numero || '').replace(/[^A-Za-z0-9]/g, '')
+    });
+    pedidoManual.pixCodigo = codigo;
+
+    var comPix = document.getElementById('pmBlocoPix');
+    var semPix = document.getElementById('pmBlocoSemPix');
+
+    if (codigo) {
+      comPix.style.display = 'block';
+      semPix.style.display = 'none';
+      document.getElementById('pmPixCodigo').value = codigo;
+      setText('pmPixValor', fmt(o.total));
+
+      var caixaQr = document.getElementById('pmPixQr');
+      caixaQr.innerHTML = '';
+      if (window.QRCode && QRCode.toCanvas) {
+        var canvas = document.createElement('canvas');
+        caixaQr.appendChild(canvas);
+        QRCode.toCanvas(canvas, codigo, { width: 148, margin: 1 }, function(err) {
+          // Sem QR o pedido ainda é cobrável: o "copia e cola" é o que
+          // realmente vai pelo WhatsApp.
+          if (err) { console.warn('QR do Pix:', err); caixaQr.style.display = 'none'; }
+        });
+      } else {
+        caixaQr.style.display = 'none';
+      }
+    } else {
+      comPix.style.display = 'none';
+      semPix.style.display = 'block';
+      setHTML('pmSemPixTexto', pixConfig.chave
+        ? 'Falta o nome do recebedor ou a cidade para montar o código Pix. Preencha em <strong>Config → Pix</strong>.'
+        : 'Nenhuma chave Pix configurada. Preencha em <strong>Config → Pix</strong> e o código passa a sair pronto aqui. A mensagem do WhatsApp continua funcionando, só sem o código de pagamento.');
+    }
+
+    var btnEmail = document.getElementById('pmBtnEmail');
+    if (btnEmail) {
+      btnEmail.disabled = !o.cliente_email;
+      btnEmail.style.opacity = o.cliente_email ? '1' : '0.4';
+      btnEmail.title = o.cliente_email ? 'Enviar para ' + o.cliente_email : 'Este cliente não tem e-mail cadastrado';
+    }
+  }
+
+  // A mensagem que vai para a conversa. Texto puro, com o resumo e o
+  // código Pix — o cliente copia direto dali e paga no app do banco.
+  function pmMensagemWhatsApp() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return '';
+    var t = pedidoManual.totais || { frete: Number(o.frete), desconto: 0 };
+
+    var linhas = [];
+    linhas.push('Olá, ' + o.cliente_nome + '! Seu pedido está montado 🛍');
+    linhas.push('');
+    linhas.push('*Pedido #' + o.numero + '*');
+    pedidoManual.itens.forEach(function(i) {
+      linhas.push('• ' + i.quantidade + 'x ' + i.produto_nome + ' — ' + fmt(i.quantidade * i.preco_unitario));
+    });
+    linhas.push('');
+    if (Number(t.frete) > 0) linhas.push('Frete: ' + fmt(t.frete));
+    if (Number(t.desconto) > 0) linhas.push('Desconto: -' + fmt(t.desconto));
+    linhas.push('*Total: ' + fmt(o.total) + '*');
+    linhas.push('');
+
+    if (o.tipo_entrega === 'retirada') {
+      linhas.push('Retirada na loja.');
+    } else if (o.cliente_endereco) {
+      linhas.push('Entrega em: ' + o.cliente_endereco);
+    }
+
+    if (pedidoManual.pixCodigo) {
+      linhas.push('');
+      linhas.push('*Pagamento por Pix* (copie o código abaixo e cole no app do seu banco):');
+      linhas.push('');
+      linhas.push(pedidoManual.pixCodigo);
+      linhas.push('');
+      linhas.push('Assim que o pagamento cair eu já separo tudo. Se puder, me manda o comprovante por aqui 🙏');
+    } else {
+      linhas.push('');
+      linhas.push('Me confirma que eu te passo os dados para o pagamento.');
+    }
+
+    return linhas.join('\n');
+  }
+
+  function pmEnviarWhatsApp() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return;
+    var w = String(o.cliente_whatsapp || '').replace(/\D/g, '');
+    if (!w) { showToast('Este pedido não tem WhatsApp', true); return; }
+    // O número já pode vir com o 55 do cadastro; repetir daria 5555.
+    if (w.length <= 11) w = '55' + w;
+    window.open('https://wa.me/' + w + '?text=' + encodeURIComponent(pmMensagemWhatsApp()), '_blank', 'noopener');
+    setHTML('pmEnvioMsg', '✓ WhatsApp aberto com a mensagem pronta. Só apertar enviar.');
+  }
+
+  function pmCopiarPix() {
+    var codigo = pedidoManual && pedidoManual.pixCodigo;
+    if (!codigo) return;
+    navigator.clipboard.writeText(codigo)
+      .then(function() { toast('✓ Código Pix copiado!', 'green'); })
+      .catch(function() {
+        var el = document.getElementById('pmPixCodigo');
+        if (el) { el.select(); }
+        toast('Selecione e copie o código', 'red');
+      });
+  }
+
+  // O aviso por e-mail tem dois caminhos. Se a função `enviar-email-pedido`
+  // estiver publicada no Supabase, o e-mail sai sozinho. Enquanto não
+  // estiver, abre o aplicativo de e-mail com tudo escrito e basta apertar
+  // enviar — o que já resolve, e não deixa o botão sem função.
+  async function pmEnviarEmail() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return;
+    if (!o.cliente_email) { showToast('Este cliente não tem e-mail cadastrado', true); return; }
+
+    var btn = document.getElementById('pmBtnEmail');
+    if (btn) { btn.disabled = true; btn.textContent = 'ENVIANDO...'; }
+    setHTML('pmEnvioMsg', 'Enviando e-mail...');
+
+    try {
+      var r = await sb.functions.invoke('enviar-email-pedido', { body: { pedido_id: o.id } });
+      if (!r.error && r.data && r.data.ok) {
+        setHTML('pmEnvioMsg', '✓ E-mail enviado para <strong>' + esc(o.cliente_email) + '</strong>.');
+        toast('E-mail enviado', 'green');
+        return;
+      }
+      console.warn('Envio automático indisponível:', r.error || r.data);
+    } catch (e) {
+      console.warn('Envio automático indisponível:', e);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✉ Enviar e-mail'; }
+    }
+
+    pmAbrirEmailNoAplicativo();
+  }
+
+  // O mesmo resumo do WhatsApp, sem os asteriscos de negrito, que em
+  // e-mail apareceriam como asterisco mesmo.
+  function pmLinkEmail() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o || !o.cliente_email) return '';
+    var assunto = 'Pedido #' + o.numero + ' registrado — Alpha Galerie';
+    var corpo = pmMensagemWhatsApp().replace(/\*/g, '');
+    return 'mailto:' + encodeURIComponent(o.cliente_email) +
+      '?subject=' + encodeURIComponent(assunto) +
+      '&body=' + encodeURIComponent(corpo);
+  }
+
+  function pmAbrirEmailNoAplicativo() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return;
+    var link = pmLinkEmail();
+    if (!link) return;
+    window.location.href = link;
+    setHTML('pmEnvioMsg',
+      'Abri seu aplicativo de e-mail com a mensagem pronta para <strong>' + esc(o.cliente_email) + '</strong> — é só apertar enviar.<br>' +
+      '<span style="color:var(--text-faint);">Para o e-mail sair sozinho, publique a função <span class="mono">enviar-email-pedido</span> (o passo a passo está no arquivo dela).</span>');
+  }
+
+  function pmAbrirPedidoCriado() {
+    var o = pedidoManual && pedidoManual.criado;
+    if (!o) return;
+    closeModal('pedidoManualModal');
+    pedidoManual = null;
+    openOrderDetail(o.id);
   }
 
   // ============================================
