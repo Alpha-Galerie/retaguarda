@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin · Alpha Galerie · v2026.09.18</title>
+  <title>Admin · Alpha Galerie · v2026.09.23</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1029,7 +1029,7 @@
       </div>
       <div class="login-sub">PAINEL ADMINISTRATIVO</div>
       <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;color:var(--text-faint);margin-bottom:20px;">
-        v2026.09.18 · LOGIN SUPABASE
+        v2026.09.23 · LOGIN SUPABASE
       </div>
 
       <form id="loginForm" onsubmit="doLogin(event)">
@@ -1082,7 +1082,7 @@
           alpha.galerie
         </div>
         <nav class="topbar-tabs">
-          <button class="tab-btn active" data-tab="pedidos" onclick="switchTab('pedidos')">Pedidos</button>
+          <button class="tab-btn active" data-tab="pedidos" onclick="switchTab('pedidos')">Pedidos<span id="alertaBadge" style="display:none;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:7px;padding:0 5px;background:var(--red);color:#fff;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;vertical-align:middle;"></span></button>
           <button class="tab-btn" data-tab="produtos" onclick="switchTab('produtos')">Produtos</button>
           <button class="tab-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
           <button class="tab-btn" data-tab="performance" onclick="switchTab('performance')" style="color:#c9a961;">📊 Performance</button>
@@ -1715,6 +1715,35 @@
             </div>
           </div>
           <div id="pixMsg" style="font-size:11px;margin-top:10px;"></div>
+        </div>
+
+        <!-- AVISO DE PEDIDO NOVO -->
+        <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">🔔 AVISO DE PEDIDO NOVO</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-bottom:18px;line-height:1.6;">
+            A retaguarda confere se entrou pedido a cada 25 segundos. Quando entra, toca um sino, aparece um
+            aviso na tela e o título da aba muda — dá para ver mesmo com esta janela atrás de outra.
+            <strong style="color:var(--text-dim);">Só funciona com a retaguarda aberta em alguma aba.</strong>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="btn-mini" id="btnAlertaSom" onclick="alternarSomAlerta()">🔔 SOM LIGADO</button>
+            <button class="btn-mini" id="btnAlertaSomenteSite" onclick="alternarSomenteSite()">AVISAR TODOS OS PEDIDOS</button>
+            <button class="btn-mini" onclick="testarAlerta()">TESTAR AGORA</button>
+          </div>
+
+          <div style="border-top:1px solid var(--line);padding-top:14px;">
+            <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);margin-bottom:6px;">NOTIFICAÇÃO DA ÁREA DE TRABALHO</div>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+              <button class="btn-mini" onclick="pedirPermissaoNotificacao()">PERMITIR NOTIFICAÇÃO</button>
+              <span id="alertaEstadoNotificacao" style="font-size:11px;color:var(--text-faint);">desligada — clique para permitir</span>
+            </div>
+          </div>
+
+          <div style="font-size:10px;color:var(--text-faint);margin-top:14px;line-height:1.6;border-top:1px solid var(--line);padding-top:12px;">
+            Clique em <strong style="color:var(--text-dim);">TESTAR AGORA</strong> para conferir se o som sai neste
+            computador, sem precisar esperar uma venda de verdade.
+          </div>
         </div>
 
         <!-- ENDEREÇO E CONTATO DA LOJA -->
@@ -2506,6 +2535,23 @@
   </div>
 
 
+
+  <!-- ALERTA DE PEDIDO NOVO -->
+  <div id="alertaBanner" style="display:none;position:fixed;top:16px;left:50%;transform:translateX(-50%);
+       z-index:9999;align-items:center;gap:16px;background:var(--bg-soft);border:1px solid var(--gold);
+       border-left:4px solid var(--gold);padding:14px 18px;box-shadow:0 10px 40px rgba(0,0,0,.6);
+       max-width:min(560px,calc(100vw - 32px));">
+    <span style="font-size:22px;line-height:1;" aria-hidden="true">🔔</span>
+    <div style="min-width:0;flex:1;">
+      <div id="alertaBannerTitulo" class="mono" style="font-size:11px;letter-spacing:.15em;color:var(--gold);">Novo pedido</div>
+      <div id="alertaBannerDetalhe" style="font-size:13px;color:var(--text);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</div>
+    </div>
+    <button onclick="verPedidosNovos()" style="background:var(--gold);color:#000;border:none;padding:9px 16px;
+            font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.12em;cursor:pointer;white-space:nowrap;">VER</button>
+    <button onclick="limparAlerta()" aria-label="Dispensar aviso" style="background:none;border:none;color:var(--text-faint);
+            font-size:18px;line-height:1;cursor:pointer;padding:0 2px;">×</button>
+  </div>
+
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
@@ -2655,7 +2701,12 @@
     document.getElementById('app').classList.add('show');
     var info = document.getElementById('userInfo');
     if (info) info.textContent = emailLogado();
-    loadAll();
+    // O navegador só libera áudio depois de um gesto da pessoa. O login é
+    // esse gesto — sem isso, o primeiro pedido do dia chegaria mudo.
+    desbloquearSom();
+    loadAll().then(function() {
+      iniciarVigiaDePedidos();
+    });
   }
 
   async function doLogout() {
@@ -2998,6 +3049,265 @@
   }
 
   // ============================================
+  // ALERTA DE PEDIDO NOVO
+  // --------------------------------------------
+  // Antes, pedido só aparecia quando alguém recarregava a tela. O dono
+  // ficava entrando de tempo em tempo para ver se tinha vendido, e pedido
+  // do site podia ficar horas parado sem ninguém saber.
+  //
+  // A verificação é por consulta periódica, não por websocket. O websocket
+  // do Supabase seria instantâneo, mas morre em silêncio quando o notebook
+  // dorme ou a rede oscila — e aí o alerta para de tocar sem avisar que
+  // parou, que é o pior defeito possível para esta função. A consulta
+  // custa uma linha a cada 25 segundos e se recupera sozinha.
+  // ============================================
+  var ALERTA_INTERVALO_MS = 25000;
+  var alertaUltimoId = 0;
+  var alertaVigiaAtivo = false;
+  var alertaTimer = null;
+  var alertaPendentes = [];
+  var alertaTituloOriginal = document.title;
+  var alertaAudioCtx = null;
+
+  function alertaConfig(chave, padrao) {
+    try {
+      var v = localStorage.getItem('alerta_' + chave);
+      return v === null ? padrao : v === '1';
+    } catch (e) { return padrao; }
+  }
+  function alertaGravarConfig(chave, valor) {
+    try { localStorage.setItem('alerta_' + chave, valor ? '1' : '0'); } catch (e) {}
+  }
+
+  // O navegador bloqueia som até a pessoa interagir com a página. O clique
+  // do login já serve como essa interação: é ali que o contexto de áudio
+  // nasce, para o primeiro pedido do dia já tocar.
+  function desbloquearSom() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!alertaAudioCtx) alertaAudioCtx = new AC();
+      if (alertaAudioCtx.state === 'suspended') alertaAudioCtx.resume();
+    } catch (e) { console.warn('Áudio indisponível:', e); }
+  }
+
+  // Sino sintetizado em vez de arquivo de som: nada para baixar, nada para
+  // quebrar se o arquivo sumir, e funciona sem internet.
+  function tocarSino() {
+    if (!alertaConfig('som', true)) return;
+    desbloquearSom();
+    if (!alertaAudioCtx || alertaAudioCtx.state !== 'running') return;
+    try {
+      var ctx = alertaAudioCtx;
+      [0, 0.18].forEach(function(atraso, i) {
+        var osc = ctx.createOscillator();
+        var vol = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = i === 0 ? 880 : 1320;   // lá e mi acima
+        var t = ctx.currentTime + atraso;
+        vol.gain.setValueAtTime(0.0001, t);
+        vol.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+        vol.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+        osc.connect(vol); vol.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 1);
+      });
+    } catch (e) { console.warn('Som do alerta:', e); }
+  }
+
+  function pedirPermissaoNotificacao() {
+    if (!('Notification' in window)) {
+      showToast('Este navegador não tem notificação na área de trabalho', true);
+      return;
+    }
+    Notification.requestPermission().then(function(p) {
+      atualizarBotoesAlerta();
+      if (p === 'granted') {
+        showToast('Notificação ligada ✓');
+        new Notification('Alpha Galerie', { body: 'Pronto. Vou te avisar aqui quando entrar pedido.' });
+      } else {
+        showToast('Permissão negada pelo navegador', true);
+      }
+    });
+  }
+
+  function notificarNaAreaDeTrabalho(pedido) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      var n = new Notification('🔔 Novo pedido — ' + fmt(pedido.total), {
+        body: (pedido.cliente_nome || 'Cliente') + ' · pedido #' + (pedido.numero || pedido.id),
+        tag: 'pedido-' + pedido.id,
+        requireInteraction: true
+      });
+      n.onclick = function() { window.focus(); verPedidosNovos(); n.close(); };
+    } catch (e) { console.warn('Notificação:', e); }
+  }
+
+  // O título da aba é o que o dono enxerga quando a retaguarda está aberta
+  // atrás de outra janela — costuma ser o único sinal que ele vê.
+  function atualizarTituloAlerta() {
+    var n = alertaPendentes.length;
+    document.title = n > 0
+      ? '(' + n + ') 🔔 Novo pedido · Alpha Galerie'
+      : alertaTituloOriginal;
+    var badge = document.getElementById('alertaBadge');
+    if (badge) {
+      badge.textContent = n > 0 ? String(n) : '';
+      badge.style.display = n > 0 ? 'inline-flex' : 'none';
+    }
+  }
+
+  function renderBanner() {
+    var wrap = document.getElementById('alertaBanner');
+    if (!wrap) return;
+    if (alertaPendentes.length === 0) { wrap.style.display = 'none'; return; }
+
+    var ultimo = alertaPendentes[0];
+    var extras = alertaPendentes.length - 1;
+    wrap.style.display = 'flex';
+    setText('alertaBannerTitulo',
+      alertaPendentes.length === 1 ? 'Novo pedido' : alertaPendentes.length + ' pedidos novos');
+    setText('alertaBannerDetalhe',
+      '#' + (ultimo.numero || ultimo.id) + ' · ' + (ultimo.cliente_nome || 'Cliente') +
+      ' · ' + fmt(ultimo.total) + (extras > 0 ? '  (e mais ' + extras + ')' : ''));
+  }
+
+  function verPedidosNovos() {
+    var primeiro = alertaPendentes.length ? alertaPendentes[alertaPendentes.length - 1] : null;
+    limparAlerta();
+    switchTab('pedidos');
+    if (primeiro) {
+      // O pedido pode ter chegado depois do último carregamento da lista.
+      var conhecido = allOrders.some(function(o) { return String(o.id) === String(primeiro.id); });
+      if (conhecido) openOrderDetail(primeiro.id);
+      else loadOrders().then(function() { openOrderDetail(primeiro.id); });
+    }
+  }
+
+  function limparAlerta() {
+    alertaPendentes = [];
+    atualizarTituloAlerta();
+    renderBanner();
+  }
+
+  function anunciarPedidos(novos) {
+    // Mais recente primeiro, para o banner mostrar o último que entrou.
+    alertaPendentes = novos.slice().reverse().concat(alertaPendentes);
+    tocarSino();
+    atualizarTituloAlerta();
+    renderBanner();
+    novos.forEach(notificarNaAreaDeTrabalho);
+  }
+
+  // Um pedido criado aqui dentro não pode disparar alerta para quem acabou
+  // de criá-lo.
+  function marcarPedidoComoVisto(id) {
+    var n = Number(id) || 0;
+    if (n > alertaUltimoId) alertaUltimoId = n;
+  }
+
+  async function verificarPedidosNovos() {
+    if (!alertaVigiaAtivo || !alertaUltimoId) return;
+    try {
+      var res = await sb.from('pedidos')
+        .select('id,numero,cliente_nome,total,criado_em,observacoes')
+        .gt('id', alertaUltimoId)
+        .order('id', { ascending: true })
+        .limit(30);
+      if (res.error) { console.warn('Vigia de pedidos:', res.error.message); return; }
+
+      var novos = res.data || [];
+      if (novos.length === 0) return;
+
+      marcarPedidoComoVisto(novos[novos.length - 1].id);
+
+      if (alertaConfig('somenteSite', false)) {
+        novos = novos.filter(function(p) { return getCanal(p) !== 'pdv'; });
+      }
+      if (novos.length === 0) return;
+
+      anunciarPedidos(novos);
+      loadOrders();
+      renderStats();
+    } catch (e) {
+      // Falha de rede não pode derrubar o vigia: o intervalo tenta de novo.
+      console.warn('Vigia de pedidos:', e);
+    }
+  }
+
+  async function iniciarVigiaDePedidos() {
+    if (alertaVigiaAtivo) return;
+
+    // A marca d'água começa no maior id já conhecido, senão o primeiro
+    // ciclo anunciaria o histórico inteiro como se fosse novidade.
+    var maior = 0;
+    (allOrders || []).forEach(function(o) { maior = Math.max(maior, Number(o.id) || 0); });
+    if (!maior) {
+      var res = await sb.from('pedidos').select('id').order('id', { ascending: false }).limit(1);
+      if (res.error) { console.warn('Vigia de pedidos:', res.error.message); return; }
+      maior = res.data && res.data.length ? Number(res.data[0].id) : 0;
+    }
+    // Loja sem nenhum pedido ainda: -1 faz o primeiro de todos ser anunciado.
+    alertaUltimoId = maior || -1;
+
+    alertaVigiaAtivo = true;
+    if (alertaTimer) clearInterval(alertaTimer);
+    alertaTimer = setInterval(verificarPedidosNovos, ALERTA_INTERVALO_MS);
+
+    // Voltar para a aba depois de um tempo fora é o momento mais provável
+    // de haver pedido acumulado — vale checar na hora, sem esperar o ciclo.
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) verificarPedidosNovos();
+    });
+    atualizarBotoesAlerta();
+  }
+
+  function alternarSomAlerta() {
+    var novo = !alertaConfig('som', true);
+    alertaGravarConfig('som', novo);
+    if (novo) { desbloquearSom(); tocarSino(); }
+    atualizarBotoesAlerta();
+  }
+
+  function alternarSomenteSite() {
+    alertaGravarConfig('somenteSite', !alertaConfig('somenteSite', false));
+    atualizarBotoesAlerta();
+  }
+
+  function testarAlerta() {
+    desbloquearSom();
+    anunciarPedidos([{
+      id: -1, numero: 'TESTE', cliente_nome: 'Pedido de teste', total: 0,
+      criado_em: new Date().toISOString(), observacoes: ''
+    }]);
+    showToast('Se você ouviu o sino e viu o aviso, está funcionando ✓');
+  }
+
+  function atualizarBotoesAlerta() {
+    var som = alertaConfig('som', true);
+    var btnSom = document.getElementById('btnAlertaSom');
+    if (btnSom) btnSom.textContent = som ? '🔔 SOM LIGADO' : '🔕 SOM DESLIGADO';
+
+    var btnSite = document.getElementById('btnAlertaSomenteSite');
+    if (btnSite) {
+      btnSite.textContent = alertaConfig('somenteSite', false)
+        ? 'AVISAR SÓ PEDIDO DO SITE' : 'AVISAR TODOS OS PEDIDOS';
+    }
+
+    var estado = document.getElementById('alertaEstadoNotificacao');
+    if (estado) {
+      var p = ('Notification' in window) ? Notification.permission : 'indisponivel';
+      var textos = {
+        granted: '✓ ligada — aparece mesmo com a aba atrás de outra janela',
+        denied: '✗ bloqueada no navegador. Libere no cadeado ao lado do endereço.',
+        'default': 'desligada — clique para permitir',
+        indisponivel: 'este navegador não tem esse recurso'
+      };
+      estado.textContent = textos[p] || textos['default'];
+      estado.style.color = p === 'granted' ? 'var(--green)' : p === 'denied' ? 'var(--red)' : 'var(--text-faint)';
+    }
+  }
+
+  // ============================================
   // TABS
   // ============================================
   function switchTab(tab) {
@@ -3008,6 +3318,8 @@
       c.style.display = 'none';
     });
     document.getElementById('tab-' + tab).style.display = 'block';
+    // Chegar na lista de pedidos é o mesmo que dizer "já vi".
+    if (tab === 'pedidos') limparAlerta();
     if (tab === 'produtos') {
       if (!productsLoaded && !productsLoading) {
         var prodBody = document.getElementById('prodBody');
@@ -3036,6 +3348,7 @@
       renderClients();
     }
     if (tab === 'configuracoes') {
+      atualizarBotoesAlerta();
       carregarCupons();
       carregarLoja();
       carregarPix();
@@ -4562,6 +4875,7 @@
       if (insItens.error) throw insItens.error;
 
       closeModal('clienteModal');
+      marcarPedidoComoVisto(novo.id);
       await loadOrders();
       montarIndiceClientes();
       renderStats();
