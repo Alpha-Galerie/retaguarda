@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin · Alpha Galerie · v2026.09.23</title>
+  <title>Admin · Alpha Galerie · v2026.09.23b</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1029,7 +1029,7 @@
       </div>
       <div class="login-sub">PAINEL ADMINISTRATIVO</div>
       <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;color:var(--text-faint);margin-bottom:20px;">
-        v2026.09.23 · LOGIN SUPABASE
+        v2026.09.23b · LOGIN SUPABASE
       </div>
 
       <form id="loginForm" onsubmit="doLogin(event)">
@@ -1731,6 +1731,7 @@
             <button class="btn-mini" id="btnAlertaSomenteSite" onclick="alternarSomenteSite()">AVISAR TODOS OS PEDIDOS</button>
             <button class="btn-mini" onclick="testarAlerta()">TESTAR AGORA</button>
           </div>
+          <div id="alertaEstadoSom" style="font-size:11px;color:var(--text-faint);margin-bottom:16px;">—</div>
 
           <div style="border-top:1px solid var(--line);padding-top:14px;">
             <div style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);margin-bottom:6px;">NOTIFICAÇÃO DA ÁREA DE TRABALHO</div>
@@ -2537,7 +2538,9 @@
 
 
   <!-- ALERTA DE PEDIDO NOVO -->
-  <div id="alertaBanner" style="display:none;position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  <!-- top:92px e não 16px: a barra de abas ocupa de 16 a 64px, e um aviso
+       ali por cima impediria de clicar em Clientes, Produtos etc. -->
+  <div id="alertaBanner" style="display:none;position:fixed;top:92px;left:50%;transform:translateX(-50%);
        z-index:9999;align-items:center;gap:16px;background:var(--bg-soft);border:1px solid var(--gold);
        border-left:4px solid var(--gold);padding:14px 18px;box-shadow:0 10px 40px rgba(0,0,0,.6);
        max-width:min(560px,calc(100vw - 32px));">
@@ -2545,6 +2548,12 @@
     <div style="min-width:0;flex:1;">
       <div id="alertaBannerTitulo" class="mono" style="font-size:11px;letter-spacing:.15em;color:var(--gold);">Novo pedido</div>
       <div id="alertaBannerDetalhe" style="font-size:13px;color:var(--text);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</div>
+      <div id="alertaSomBloqueadoAviso" style="display:none;margin-top:6px;">
+        <button onclick="ligarSomAgora()" style="background:none;border:none;padding:0;cursor:pointer;
+                color:var(--orange,#e0a23a);font-size:11px;text-decoration:underline;font-family:inherit;">
+          🔇 O som está bloqueado pelo navegador — clique para ligar
+        </button>
+      </div>
     </div>
     <button onclick="verPedidosNovos()" style="background:var(--gold);color:#000;border:none;padding:9px 16px;
             font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.12em;cursor:pointer;white-space:nowrap;">VER</button>
@@ -2704,6 +2713,10 @@
     // O navegador só libera áudio depois de um gesto da pessoa. O login é
     // esse gesto — sem isso, o primeiro pedido do dia chegaria mudo.
     desbloquearSom();
+    // Quem entra pela sessão salva não clicou em nada, e sem gesto o
+    // navegador mantém o áudio suspenso. O primeiro clique em qualquer
+    // lugar da tela resolve.
+    armarDesbloqueioPorGesto();
     loadAll().then(function() {
       iniciarVigiaDePedidos();
     });
@@ -3068,6 +3081,8 @@
   var alertaPendentes = [];
   var alertaTituloOriginal = document.title;
   var alertaAudioCtx = null;
+  var alertaSomBloqueado = false;   // sino que não saiu por falta de gesto
+  var alertaGestoArmado = false;
 
   function alertaConfig(chave, padrao) {
     try {
@@ -3079,16 +3094,42 @@
     try { localStorage.setItem('alerta_' + chave, valor ? '1' : '0'); } catch (e) {}
   }
 
-  // O navegador bloqueia som até a pessoa interagir com a página. O clique
-  // do login já serve como essa interação: é ali que o contexto de áudio
-  // nasce, para o primeiro pedido do dia já tocar.
+  // O navegador só libera som depois de um gesto da pessoa. Entrar pelo
+  // formulário de login é um gesto, mas quem já tem sessão salva entra
+  // direto, sem clicar em nada — e aí o contexto nasce suspenso e o sino
+  // toca mudo. Por isso o desbloqueio também fica armado no primeiro
+  // clique ou tecla em qualquer lugar da tela.
   function desbloquearSom() {
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
+      if (!AC) return false;
       if (!alertaAudioCtx) alertaAudioCtx = new AC();
-      if (alertaAudioCtx.state === 'suspended') alertaAudioCtx.resume();
-    } catch (e) { console.warn('Áudio indisponível:', e); }
+      if (alertaAudioCtx.state === 'suspended') {
+        alertaAudioCtx.resume().then(function() {
+          if (alertaAudioCtx.state === 'running' && alertaSomBloqueado) {
+            // Havia sino engolido esperando permissão: toca agora.
+            alertaSomBloqueado = false;
+            renderBanner();
+            tocarSino();
+          }
+          atualizarBotoesAlerta();
+        }).catch(function() {});
+      }
+      return alertaAudioCtx.state === 'running';
+    } catch (e) { console.warn('Áudio indisponível:', e); return false; }
+  }
+
+  // Um gesto qualquer serve, e uma vez só: depois disso o áudio fica livre
+  // pelo resto da sessão.
+  function armarDesbloqueioPorGesto() {
+    if (alertaGestoArmado) return;
+    alertaGestoArmado = true;
+    var eventos = ['pointerdown', 'keydown', 'touchstart'];
+    var aoGesto = function() {
+      eventos.forEach(function(ev) { document.removeEventListener(ev, aoGesto, true); });
+      desbloquearSom();
+    };
+    eventos.forEach(function(ev) { document.addEventListener(ev, aoGesto, true); });
   }
 
   // Sino sintetizado em vez de arquivo de som: nada para baixar, nada para
@@ -3096,7 +3137,15 @@
   function tocarSino() {
     if (!alertaConfig('som', true)) return;
     desbloquearSom();
-    if (!alertaAudioCtx || alertaAudioCtx.state !== 'running') return;
+    if (!alertaAudioCtx || alertaAudioCtx.state !== 'running') {
+      // Falhar em silêncio aqui seria o pior: o dono acharia que o alerta
+      // não funciona. O aviso na tela passa a oferecer o clique que falta.
+      alertaSomBloqueado = true;
+      renderBanner();
+      atualizarBotoesAlerta();
+      return;
+    }
+    alertaSomBloqueado = false;
     try {
       var ctx = alertaAudioCtx;
       [0, 0.18].forEach(function(atraso, i) {
@@ -3169,6 +3218,24 @@
     setText('alertaBannerDetalhe',
       '#' + (ultimo.numero || ultimo.id) + ' · ' + (ultimo.cliente_nome || 'Cliente') +
       ' · ' + fmt(ultimo.total) + (extras > 0 ? '  (e mais ' + extras + ')' : ''));
+
+    var aviso = document.getElementById('alertaSomBloqueadoAviso');
+    if (aviso) aviso.style.display = alertaSomBloqueado ? 'block' : 'none';
+  }
+
+  // O clique aqui é o gesto que faltava para o navegador soltar o áudio.
+  // Quem toca o sino guardado é o próprio desbloquearSom(), ao ver que o
+  // contexto voltou a rodar — se esta função também tocasse, sairia sino
+  // dobrado, porque o clique já dispara o desbloqueio armado no documento.
+  function ligarSomAgora() {
+    desbloquearSom();
+    setTimeout(function() {
+      var pronto = alertaAudioCtx && alertaAudioCtx.state === 'running';
+      showToast(pronto
+        ? 'Som liberado ✓'
+        : 'O navegador não liberou o som. Verifique o volume e o cadeado ao lado do endereço.', !pronto);
+      atualizarBotoesAlerta();
+    }, 150);
   }
 
   function verPedidosNovos() {
@@ -3286,6 +3353,15 @@
     var som = alertaConfig('som', true);
     var btnSom = document.getElementById('btnAlertaSom');
     if (btnSom) btnSom.textContent = som ? '🔔 SOM LIGADO' : '🔕 SOM DESLIGADO';
+
+    var estadoSom = document.getElementById('alertaEstadoSom');
+    if (estadoSom) {
+      var pronto = alertaAudioCtx && alertaAudioCtx.state === 'running';
+      estadoSom.textContent = !som ? 'som desligado por você'
+        : pronto ? '✓ pronto para tocar'
+        : 'aguardando um clique seu — o navegador só libera áudio depois disso';
+      estadoSom.style.color = !som ? 'var(--text-faint)' : pronto ? 'var(--green)' : 'var(--orange,#e0a23a)';
+    }
 
     var btnSite = document.getElementById('btnAlertaSomenteSite');
     if (btnSite) {
