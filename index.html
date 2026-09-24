@@ -1016,6 +1016,40 @@
       .kpi-grid, .ops-grid { grid-template-columns: 1fr; }
     }
 
+    /* ── Alpha Club ─────────────────────────────────────────────── */
+    .clube-status {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.15em; text-transform: uppercase;
+      padding: 6px 12px; border: 1px solid;
+    }
+    .clube-status.on { color: var(--green); border-color: var(--green); background: rgba(74,222,128,0.08); }
+    .clube-status.off { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
+    .clube-numeros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .clube-numeros > div { background: var(--bg-soft); border: 1px solid var(--line); padding: 16px; }
+    .clube-numeros strong { display: block; font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 500; color: var(--text); line-height: 1.1; }
+    .clube-numeros span { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-faint); }
+    .clube-card { background: var(--bg-soft); border: 1px solid var(--line); padding: 20px; margin-bottom: 20px; }
+    .clube-card-titulo { font-size: 9px; letter-spacing: 0.2em; color: var(--gold); margin-bottom: 6px; }
+    .clube-card-ajuda { font-size: 10px; color: var(--text-faint); margin-bottom: 18px; line-height: 1.6; }
+    .clube-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+    .clube-grade label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+    .clube-grade label small { text-transform: none; letter-spacing: 0; color: var(--text-faint); }
+    .clube-grade input { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+    .clube-grade input:focus { outline: none; border-color: var(--gold); }
+    .clube-previa { background: var(--bg); border: 1px solid var(--line); padding: 14px; font-size: 12px; color: var(--text-dim); line-height: 1.7; margin-bottom: 14px; }
+    .clube-previa strong { color: var(--gold); }
+    .clube-tabela { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .clube-tabela th { text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    .clube-tabela td { padding: 8px; border-bottom: 1px solid var(--line); color: var(--text-dim); }
+    .clube-tabela td.num { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+    @media (max-width: 900px) {
+      .clube-numeros { grid-template-columns: repeat(2, 1fr); }
+      .clube-grade { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .clube-grade { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -1085,6 +1119,7 @@
           <button class="tab-btn active" data-tab="pedidos" onclick="switchTab('pedidos')">Pedidos<span id="alertaBadge" style="display:none;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:7px;padding:0 5px;background:var(--red);color:#fff;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;vertical-align:middle;"></span></button>
           <button class="tab-btn" data-tab="produtos" onclick="switchTab('produtos')">Produtos</button>
           <button class="tab-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
+          <button class="tab-btn" data-tab="clube" onclick="switchTab('clube')" style="color:#c9a961;">⭐ Alpha Club</button>
           <button class="tab-btn" data-tab="performance" onclick="switchTab('performance')" style="color:#c9a961;">📊 Performance</button>
           <button class="tab-btn" data-tab="configuracoes" onclick="switchTab('configuracoes')" style="color:#888;">⚙ Config</button>
         </nav>
@@ -1625,6 +1660,89 @@
       </div>
 
       <!-- CONFIGURAÇÕES TAB -->
+      <!-- ALPHA CLUB TAB -->
+      <div id="tab-clube" class="tab-content" style="display:none;">
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <h2 class="page-title"><span id="clubeTituloNome">Alpha Club</span> — <em>pontos e fidelidade</em></h2>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <span id="clubeStatus" class="clube-status off">—</span>
+            <button id="clubeBtnLigar" onclick="alternarClube()" style="background:var(--gold);color:#000;border:none;padding:10px 18px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">—</button>
+            <a class="btn-mini" href="https://alphagalerie.com/alpha-club" target="_blank" rel="noopener">REGULAMENTO NO SITE ↗</a>
+          </div>
+        </div>
+
+        <div class="clube-numeros">
+          <div><strong id="clubeNumMembros">—</strong><span>Clientes no clube</span></div>
+          <div><strong id="clubeNumAberto">—</strong><span>Pontos em aberto</span></div>
+          <div><strong id="clubeNumUsados">—</strong><span>Pontos usados · 30 dias</span></div>
+          <div><strong id="clubeNumDesconto">—</strong><span>Desconto em pedidos · 30 dias</span></div>
+        </div>
+
+        <!-- REGRAS -->
+        <div class="clube-card">
+          <div class="clube-card-titulo">⚙ REGRAS DO PROGRAMA</div>
+          <div class="clube-card-ajuda">
+            Tudo aqui vale na hora, no site e no banco: pontos de novas compras, uso no checkout, troca por cupom e bônus.
+            Pontos que o cliente já tem não mudam quando você altera uma regra.
+          </div>
+
+          <div class="clube-grade">
+            <div><label>Nome do programa</label><input id="clubeNome" oninput="atualizarPreviaClube()" placeholder="Alpha Club" style="font-family:inherit;" /></div>
+            <div><label>Pontos por R$ 1 gasto</label><input id="clubePontosPorReal" type="number" step="0.1" min="0" oninput="atualizarPreviaClube()" /></div>
+            <div><label>Valor de 1 ponto <small>(R$)</small></label><input id="clubeValorPonto" type="number" step="0.01" min="0" oninput="atualizarPreviaClube()" /></div>
+          </div>
+          <div class="clube-grade">
+            <div><label>Validade dos pontos <small>(dias)</small></label><input id="clubeValidade" type="number" min="1" oninput="atualizarPreviaClube()" /></div>
+            <div><label>Checkout: pontos pagam até <small>(% dos produtos)</small></label><input id="clubeCheckoutMax" type="number" min="0" max="100" oninput="atualizarPreviaClube()" /></div>
+            <div><label>Cupons de troca <small>(R$, separe por vírgula)</small></label><input id="clubeCupomValores" placeholder="5, 10" oninput="atualizarPreviaClube()" /></div>
+          </div>
+          <div class="clube-grade">
+            <div><label>Validade do cupom <small>(dias)</small></label><input id="clubeCupomValidade" type="number" min="1" oninput="atualizarPreviaClube()" /></div>
+            <div><label>Carrinho mínimo do cupom <small>(× valor)</small></label><input id="clubeCupomMinimo" type="number" step="0.5" min="0" oninput="atualizarPreviaClube()" /></div>
+            <div></div>
+          </div>
+          <div class="clube-grade">
+            <div><label>Bônus boas-vindas <small>(pontos)</small></label><input id="clubeBonusBoasVindas" type="number" min="0" oninput="atualizarPreviaClube()" /></div>
+            <div><label>Bônus aniversário <small>(pontos)</small></label><input id="clubeBonusAniversario" type="number" min="0" oninput="atualizarPreviaClube()" /></div>
+            <div><label>Bônus indique e ganhe <small>(pontos)</small></label><input id="clubeBonusIndicacao" type="number" min="0" oninput="atualizarPreviaClube()" /></div>
+          </div>
+
+          <div class="clube-previa" id="clubePrevia">—</div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button onclick="salvarClube()" style="background:var(--gold);color:#000;border:none;padding:11px 22px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">SALVAR REGRAS</button>
+            <button class="btn-mini" onclick="padraoClube()">VOLTAR AO PADRÃO</button>
+            <button class="btn-mini" onclick="carregarClube()">RECARREGAR</button>
+            <span id="clubeMsg" style="font-size:11px;"></span>
+          </div>
+        </div>
+
+        <!-- CLIENTE -->
+        <div class="clube-card">
+          <div class="clube-card-titulo">👤 PONTOS DE UM CLIENTE</div>
+          <div class="clube-card-ajuda">
+            Busque pelo WhatsApp para ver saldo, lotes e cupons. Dá para dar pontos de cortesia, retirar ou zerar
+            (fraude ou mau uso, como diz o regulamento).
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+            <input id="clubeBuscaWhats" placeholder="(11) 99999-9999" onkeydown="if(event.key==='Enter')buscarClienteClube()"
+              style="flex:1;min-width:200px;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px;font-family:'JetBrains Mono',monospace;font-size:13px;" />
+            <button onclick="buscarClienteClube()" style="background:var(--gold);color:#000;border:none;padding:10px 18px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">BUSCAR</button>
+          </div>
+          <div id="clubeCliente"></div>
+        </div>
+
+        <!-- ANIVERSARIANTES -->
+        <div class="clube-card">
+          <div class="clube-card-titulo">🎂 ANIVERSARIANTES DO MÊS</div>
+          <div class="clube-card-ajuda">
+            O bônus entra quando o cliente consulta os pontos ou faz um pedido no mês. Mandar um "parabéns" pelo
+            WhatsApp avisa do presente e costuma virar venda.
+          </div>
+          <div id="clubeAniversariantes"><div style="color:var(--text-faint);font-size:11px;">—</div></div>
+        </div>
+      </div>
+
       <div id="tab-configuracoes" class="tab-content" style="display:none;">
         <div class="page-header">
           <h2 class="page-title">Configurações do <em>sistema</em></h2>
@@ -3423,6 +3541,9 @@
       montarIndiceClientes();
       renderClients();
     }
+    if (tab === 'clube') {
+      carregarClube();
+    }
     if (tab === 'configuracoes') {
       atualizarBotoesAlerta();
       carregarCupons();
@@ -4214,6 +4335,11 @@
     var comp = [];
     if (num(o.subtotal)) comp.push('Subtotal ' + fmt(o.subtotal));
     if (desconto) comp.push('Desconto −' + fmt(desconto));
+    // Alpha Club: desconto que os pontos deram no checkout do site.
+    if (num(o.cashback_usado) > 0) {
+      comp.push('Alpha Club −' + fmt(o.cashback_usado) + (num(o.pontos_usados) ? ' (' + num(o.pontos_usados) + ' pontos)' : ''));
+    }
+    if (o.cupom_codigo) comp.push('Cupom ' + o.cupom_codigo);
     var totalRow = document.getElementById('mTotalRow');
     if (totalRow) {
       var compEl = document.getElementById('mComposicao');
@@ -6777,7 +6903,9 @@
       avisarSeSemPermissao(res.error, 'cupons');
       cuponsCache = [];
     } else {
-      cuponsCache = res.data || [];
+      // Os cupons trocados por pontos no Alpha Club ficam na aba do clube;
+      // aqui só os que a loja cria.
+      cuponsCache = (res.data || []).filter(function(c) { return c.origem !== 'clube'; });
     }
     renderCupons();
   }
@@ -7577,6 +7705,320 @@
     var el = document.getElementById(id);
     if (el) el.classList.remove('open');
   }
+
+  // ============================================
+  // ALPHA CLUB
+  // --------------------------------------------
+  // As regras ficam em `configuracoes` (chaves clube_*). O banco lê essas
+  // chaves a cada pedido, então salvar aqui já muda o site e os próximos
+  // pontos. Pontos, bônus e estornos são feitos pelo banco
+  // (migração alpha_club do site); daqui só se consulta e ajusta.
+  // ============================================
+  var CAMPOS_CLUBE = [
+    { chave: 'clube_nome',                       id: 'clubeNome',             padrao: 'Alpha Club', texto: true },
+    { chave: 'clube_pontos_por_real',            id: 'clubePontosPorReal',    padrao: '1' },
+    { chave: 'clube_valor_ponto',                id: 'clubeValorPonto',       padrao: '0.10' },
+    { chave: 'clube_validade_dias',              id: 'clubeValidade',         padrao: '365' },
+    { chave: 'clube_checkout_max_percentual',    id: 'clubeCheckoutMax',      padrao: '10' },
+    { chave: 'clube_cupom_valores',              id: 'clubeCupomValores',     padrao: '5,10', texto: true },
+    { chave: 'clube_cupom_validade_dias',        id: 'clubeCupomValidade',    padrao: '30' },
+    { chave: 'clube_cupom_minimo_multiplicador', id: 'clubeCupomMinimo',      padrao: '3' },
+    { chave: 'clube_bonus_boas_vindas',          id: 'clubeBonusBoasVindas',  padrao: '50' },
+    { chave: 'clube_bonus_aniversario',          id: 'clubeBonusAniversario', padrao: '100' },
+    { chave: 'clube_bonus_indicacao',            id: 'clubeBonusIndicacao',   padrao: '100' }
+  ];
+  var clubeAtivo = null;
+
+  function valorClube(id) {
+    var el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  function pontosTxt(n) {
+    n = Math.round(Number(n) || 0);
+    return n.toLocaleString('pt-BR') + (Math.abs(n) === 1 ? ' ponto' : ' pontos');
+  }
+
+  function valoresCupomClube(txt) {
+    return String(txt || '').split(/[;,\s]+/).map(num).filter(function(v) { return v > 0; })
+      .filter(function(v, i, a) { return a.indexOf(v) === i; }).sort(function(a, b) { return a - b; });
+  }
+
+  async function carregarClube() {
+    var res = await sb.from('configuracoes').select('chave,valor')
+      .in('chave', CAMPOS_CLUBE.map(function(c) { return c.chave; }).concat(['clube_ativo']));
+    if (res.error) {
+      console.warn('Alpha Club:', res.error.message);
+      avisarSeSemPermissao(res.error, 'configurações');
+      return;
+    }
+    var mapa = {};
+    (res.data || []).forEach(function(r) { mapa[r.chave] = r.valor; });
+    if (!('clube_ativo' in mapa)) {
+      setHTML('clubePrevia', '<span style="color:var(--red);">O banco ainda não tem o Alpha Club. Aplique a migração do clube no Supabase.</span>');
+      return;
+    }
+    CAMPOS_CLUBE.forEach(function(c) {
+      var el = document.getElementById(c.id);
+      if (el) el.value = (mapa[c.chave] !== undefined && mapa[c.chave] !== null) ? mapa[c.chave] : c.padrao;
+    });
+    clubeAtivo = ['true', '1', 'sim', 'on', 'ligado'].indexOf(String(mapa.clube_ativo || '').trim().toLowerCase()) >= 0;
+    renderStatusClube();
+    atualizarPreviaClube();
+    carregarPainelClube();
+  }
+
+  function renderStatusClube() {
+    var st = document.getElementById('clubeStatus');
+    var btn = document.getElementById('clubeBtnLigar');
+    if (st) {
+      st.className = 'clube-status ' + (clubeAtivo ? 'on' : 'off');
+      st.textContent = clubeAtivo ? '● No ar' : '● Pausado';
+    }
+    if (btn) {
+      btn.textContent = clubeAtivo ? 'PAUSAR PROGRAMA' : 'LIGAR PROGRAMA';
+      btn.style.background = clubeAtivo ? 'transparent' : 'var(--gold)';
+      btn.style.color = clubeAtivo ? 'var(--red)' : '#000';
+      btn.style.border = clubeAtivo ? '1px solid var(--red)' : 'none';
+    }
+    setText('clubeTituloNome', valorClube('clubeNome') || 'Alpha Club');
+  }
+
+  async function alternarClube() {
+    if (clubeAtivo === null) return;
+    var novo = !clubeAtivo;
+    var pergunta = novo
+      ? 'Ligar o Alpha Club?\n\nO site volta a mostrar o programa, as compras voltam a gerar pontos e os clientes podem usar o saldo.'
+      : 'Pausar o Alpha Club?\n\nO site deixa de mostrar o programa, compras pagas deixam de gerar pontos e ninguém usa pontos ou troca cupom. Os saldos ficam guardados.';
+    if (!confirm(pergunta)) return;
+    var upd = await sb.from('configuracoes')
+      .update({ valor: novo ? 'true' : 'false', atualizado_em: new Date().toISOString() })
+      .eq('chave', 'clube_ativo').select('chave');
+    if (upd.error || !upd.data || !upd.data.length) {
+      showToast('Erro ao ' + (novo ? 'ligar' : 'pausar') + ': ' + ((upd.error && upd.error.message) || 'chave não encontrada'), true);
+      return;
+    }
+    clubeAtivo = novo;
+    renderStatusClube();
+    toast(novo ? 'Alpha Club no ar' : 'Alpha Club pausado', novo ? 'green' : null);
+  }
+
+  function atualizarPreviaClube() {
+    var nome = valorClube('clubeNome') || 'Alpha Club';
+    var ppr = num(valorClube('clubePontosPorReal'));
+    var vp = num(valorClube('clubeValorPonto'));
+    var dias = num(valorClube('clubeValidade'));
+    var max = num(valorClube('clubeCheckoutMax'));
+    var cupons = valoresCupomClube(valorClube('clubeCupomValores'));
+    var cupDias = num(valorClube('clubeCupomValidade'));
+    var mult = num(valorClube('clubeCupomMinimo'));
+    var pts100 = Math.floor(100 * ppr);
+    var volta = ppr * vp * 100;
+    var linhas = [];
+    linhas.push('Compra de <strong>R$ 100,00</strong> → <strong>' + pontosTxt(pts100) + '</strong> = ' + fmt(pts100 * vp) +
+      ' · <strong>' + volta.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '% de volta</strong>, válidos por ' + dias + ' dias.');
+    linhas.push('No checkout: carrinho de R$ 120,00 fora de promoção → os pontos pagam até ' + fmt(120 * max / 100) + ' (' + max + '%).');
+    if (cupons.length) {
+      linhas.push('Cupons: ' + cupons.map(function(v) {
+        return fmt(v) + ' = ' + pontosTxt(vp > 0 ? Math.ceil(v / vp) : 0) + ' (carrinho a partir de ' + fmt(v * mult) + ')';
+      }).join(' · ') + ', valem ' + cupDias + ' dias.');
+    } else {
+      linhas.push('Sem cupons de troca: o cliente só usa pontos no checkout.');
+    }
+    var bonus = [];
+    if (num(valorClube('clubeBonusBoasVindas')) > 0) bonus.push('boas-vindas ' + pontosTxt(valorClube('clubeBonusBoasVindas')));
+    if (num(valorClube('clubeBonusAniversario')) > 0) bonus.push('aniversário ' + pontosTxt(valorClube('clubeBonusAniversario')));
+    if (num(valorClube('clubeBonusIndicacao')) > 0) bonus.push('indicação ' + pontosTxt(valorClube('clubeBonusIndicacao')));
+    linhas.push('Bônus: ' + (bonus.length ? bonus.join(' · ') : 'nenhum') + '.');
+    if (volta > 30) linhas.push('<span style="color:var(--orange);">⚠ Mais de 30% de volta: confira a margem antes de salvar.</span>');
+    setHTML('clubePrevia', '<div style="font-size:9px;letter-spacing:0.15em;color:var(--text-faint);margin-bottom:6px;">COMO FICA — ' + esc(nome.toUpperCase()) + '</div>' + linhas.join('<br>'));
+  }
+
+  function padraoClube() {
+    if (!confirm('Voltar os campos para as regras de lançamento?\n(Só grava quando clicar em SALVAR REGRAS.)')) return;
+    CAMPOS_CLUBE.forEach(function(c) {
+      var el = document.getElementById(c.id);
+      if (el) el.value = c.padrao;
+    });
+    atualizarPreviaClube();
+  }
+
+  async function salvarClube() {
+    var msg = document.getElementById('clubeMsg');
+    var aviso = function(texto, cor) { if (msg) { msg.style.color = cor; msg.textContent = texto; } };
+
+    if (!valorClube('clubeNome')) { aviso('Dê um nome ao programa', 'var(--red)'); return; }
+    if (num(valorClube('clubeValorPonto')) <= 0) { aviso('O valor do ponto precisa ser maior que zero', 'var(--red)'); return; }
+    if (num(valorClube('clubePontosPorReal')) < 0) { aviso('Pontos por real não pode ser negativo', 'var(--red)'); return; }
+    if (num(valorClube('clubeValidade')) < 1 || num(valorClube('clubeCupomValidade')) < 1) { aviso('Validades precisam de pelo menos 1 dia', 'var(--red)'); return; }
+    var max = num(valorClube('clubeCheckoutMax'));
+    if (max < 0 || max > 100) { aviso('O limite do checkout vai de 0 a 100%', 'var(--red)'); return; }
+    var cupons = valoresCupomClube(valorClube('clubeCupomValores'));
+    var elCupons = document.getElementById('clubeCupomValores');
+    if (elCupons) elCupons.value = cupons.join(', ');
+
+    aviso('Salvando...', 'var(--text-dim)');
+    try {
+      for (var i = 0; i < CAMPOS_CLUBE.length; i++) {
+        var c = CAMPOS_CLUBE[i];
+        var v = valorClube(c.id);
+        if (!c.texto) v = String(num(v));
+        var upd = await sb.from('configuracoes')
+          .update({ valor: v, atualizado_em: new Date().toISOString() })
+          .eq('chave', c.chave)
+          .select('chave');
+        if (upd.error) throw upd.error;
+        if (!upd.data || upd.data.length === 0) throw new Error('a chave ' + c.chave + ' não existe no banco');
+      }
+      renderStatusClube();
+      atualizarPreviaClube();
+      aviso('✓ Salvo. Já vale no site e nos próximos pedidos.', 'var(--green)');
+      toast('Regras do Alpha Club salvas', 'green');
+    } catch (e) {
+      console.error(e);
+      aviso('Erro ao salvar: ' + (e.message || e), 'var(--red)');
+    }
+  }
+
+  async function carregarPainelClube() {
+    var res = await sb.rpc('clube_admin_painel');
+    if (res.error) {
+      console.warn('Painel do clube:', res.error.message);
+      setHTML('clubeAniversariantes', '<div style="color:var(--red);font-size:11px;">Não foi possível carregar: ' + esc(res.error.message) + '</div>');
+      return;
+    }
+    var d = res.data || {};
+    setText('clubeNumMembros', Number(d.membros || 0).toLocaleString('pt-BR'));
+    setText('clubeNumAberto', Number(d.pontos_em_aberto || 0).toLocaleString('pt-BR') + ' · ' + fmt(d.valor_em_aberto));
+    setText('clubeNumUsados', Number(d.pontos_usados_30d || 0).toLocaleString('pt-BR'));
+    setText('clubeNumDesconto', fmt(d.desconto_pedidos_30d));
+
+    var nome = valorClube('clubeNome') || 'Alpha Club';
+    var bonus = num(valorClube('clubeBonusAniversario'));
+    var lista = Array.isArray(d.aniversariantes) ? d.aniversariantes : [];
+    if (!lista.length) {
+      setHTML('clubeAniversariantes', '<div style="color:var(--text-faint);font-size:11px;">Nenhum aniversariante no clube este mês.</div>');
+      return;
+    }
+    setHTML('clubeAniversariantes', '<table class="clube-tabela"><thead><tr><th>Dia</th><th>Cliente</th><th>WhatsApp</th><th>Pontos</th><th>Presente</th><th></th></tr></thead><tbody>' +
+      lista.map(function(a) {
+        var primeiro = String(a.nome || '').split(' ')[0] || '';
+        var texto = 'Oi' + (primeiro ? ' ' + primeiro : '') + '! Feliz aniversário 🎂 ' +
+          (bonus > 0 ? 'Tem ' + pontosTxt(bonus) + ' de presente no ' + nome + ' esperando por você: ' : 'Passa lá no site: ') +
+          'é só consultar seus pontos em alphagalerie.com. Um abraço da Alpha Galerie!';
+        var link = linkWhatsApp(a.whatsapp, texto);
+        return '<tr><td class="num">' + esc(a.dia || '—') + '</td><td>' + esc(a.nome || '—') + '</td><td class="num">' + esc(a.whatsapp) + '</td>' +
+          '<td class="num">' + pontosTxt(a.pontos) + '</td><td>' + (a.bonus_dado ? '<span style="color:var(--green);">entregue</span>' : 'aguardando') + '</td>' +
+          '<td>' + (link ? '<a class="btn-mini gold" href="' + link + '" target="_blank" rel="noopener">MANDAR PARABÉNS</a>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  var clubeClienteAtual = null;
+
+  async function buscarClienteClube() {
+    var w = valorClube('clubeBuscaWhats');
+    if (w.replace(/\D/g, '').length < 10) { toast('Digite o WhatsApp com DDD'); return; }
+    setHTML('clubeCliente', '<div style="color:var(--text-faint);font-size:11px;">Buscando...</div>');
+    var res = await sb.rpc('clube_admin_cliente', { p_whatsapp: w });
+    if (res.error) {
+      setHTML('clubeCliente', '<div style="color:var(--red);font-size:11px;">Erro: ' + esc(res.error.message) + '</div>');
+      return;
+    }
+    clubeClienteAtual = res.data;
+    renderClienteClube();
+  }
+
+  function renderClienteClube() {
+    var d = clubeClienteAtual;
+    if (!d) return;
+    var m = d.membro || null;
+    var ORIGEM = { compra: 'Compra', boas_vindas: 'Boas-vindas', aniversario: 'Aniversário', indicacao: 'Indicação', ajuste: 'Ajuste da loja' };
+    var agora = new Date();
+
+    var cab = '<div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">' +
+      '<div><div style="font-size:14px;color:var(--text);">' + esc((m && m.nome) || 'Sem nome') + ' <span class="mono" style="color:var(--text-faint);font-size:11px;">' + esc(d.whatsapp) + '</span></div>' +
+      '<div style="font-size:11px;color:var(--text-faint);margin-top:4px;">' +
+        (m && m.primeira_compra_em ? 'No clube desde ' + new Date(m.primeira_compra_em).toLocaleDateString('pt-BR') : 'Ainda não fez a primeira compra paga') +
+        (m && m.nascimento_mes ? ' · aniversário ' + String(m.nascimento_dia || '').padStart(2, '0') + '/' + String(m.nascimento_mes).padStart(2, '0') : '') +
+        (m && m.indicado_por ? ' · indicado por ' + esc(m.indicado_por) : '') +
+      '</div></div>' +
+      '<div style="text-align:right;"><div style="font-family:Cormorant Garamond,serif;font-size:30px;color:var(--gold);line-height:1;">' + pontosTxt(d.pontos) + '</div>' +
+      '<div style="font-size:11px;color:var(--text-dim);">= ' + fmt(d.valor) + '</div></div></div>';
+
+    var ajuste = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px;border:1px solid var(--line);background:var(--bg);">' +
+      '<div style="width:120px;"><label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">PONTOS</label>' +
+      '<input id="clubeAjustePontos" type="number" min="1" placeholder="50" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:9px;font-family:JetBrains Mono,monospace;font-size:12px;" /></div>' +
+      '<div style="flex:1;min-width:180px;"><label style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:4px;">MOTIVO</label>' +
+      '<input id="clubeAjusteMotivo" placeholder="cortesia, compensação, fraude..." style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:9px;font-size:12px;" /></div>' +
+      '<button class="btn-mini gold" onclick="ajustarClube(1)">+ DAR PONTOS</button>' +
+      '<button class="btn-mini" onclick="ajustarClube(-1)">− RETIRAR</button>' +
+      '<button class="btn-mini" style="color:var(--red);border-color:var(--red);" onclick="zerarClube()">ZERAR SALDO</button></div>';
+
+    var lotes = (d.lotes || []);
+    var tabLotes = lotes.length
+      ? '<table class="clube-tabela" style="margin-bottom:16px;"><thead><tr><th>Data</th><th>Origem</th><th>Ganhou</th><th>Saldo</th><th>Vence</th><th>Situação</th></tr></thead><tbody>' +
+        lotes.map(function(l) {
+          var vencido = new Date(l.expira_em) <= agora;
+          var sit = l.estornado ? '<span style="color:var(--red);">estornado</span>' : (vencido ? 'vencido' : (l.saldo > 0 ? '<span style="color:var(--green);">disponível</span>' : 'usado'));
+          return '<tr><td>' + new Date(l.criado_em).toLocaleDateString('pt-BR') + '</td><td>' + esc(ORIGEM[l.origem] || l.origem) +
+            (l.obs ? ' <span style="color:var(--text-faint);">· ' + esc(l.obs) + '</span>' : '') + '</td>' +
+            '<td class="num">' + pontosTxt(l.pontos) + '</td><td class="num">' + pontosTxt(l.saldo) + '</td>' +
+            '<td>' + new Date(l.expira_em).toLocaleDateString('pt-BR') + '</td><td>' + sit + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div style="color:var(--text-faint);font-size:11px;margin-bottom:16px;">Nenhum ponto ainda.</div>';
+
+    var cupons = (d.cupons || []);
+    var tabCupons = cupons.length
+      ? '<div style="font-size:9px;letter-spacing:0.15em;color:var(--text-dim);margin-bottom:6px;">CUPONS TROCADOS</div>' +
+        '<table class="clube-tabela"><thead><tr><th>Código</th><th>Valor</th><th>Mínimo</th><th>Validade</th><th>Situação</th></tr></thead><tbody>' +
+        cupons.map(function(c) {
+          var usado = c.limite_usos !== null && c.usos >= c.limite_usos;
+          var venc = c.validade && new Date(c.validade + 'T23:59:59') < agora;
+          return '<tr><td class="num" style="color:var(--gold);">' + esc(c.codigo) + '</td><td class="num">' + fmt(c.valor) + '</td><td class="num">' + fmt(c.valor_minimo) + '</td>' +
+            '<td>' + (c.validade ? new Date(c.validade + 'T12:00:00').toLocaleDateString('pt-BR') : '—') + '</td>' +
+            '<td>' + (usado ? 'usado' : (venc ? 'vencido' : (c.ativo ? '<span style="color:var(--green);">disponível</span>' : 'desligado'))) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '';
+
+    setHTML('clubeCliente', cab + ajuste + tabLotes + tabCupons);
+  }
+
+  async function ajustarClube(sinal) {
+    if (!clubeClienteAtual) return;
+    var pts = Math.round(num(valorClube('clubeAjustePontos')));
+    var motivo = valorClube('clubeAjusteMotivo');
+    if (pts <= 0) { toast('Informe quantos pontos'); return; }
+    if (!motivo) { toast('Escreva o motivo (fica no histórico)'); return; }
+    await executarAjusteClube(sinal * pts, motivo);
+  }
+
+  async function zerarClube() {
+    var d = clubeClienteAtual;
+    if (!d || !(d.pontos > 0)) { toast('Este cliente não tem pontos'); return; }
+    var motivo = valorClube('clubeAjusteMotivo') || 'saldo zerado pela loja';
+    if (!confirm('Zerar ' + pontosTxt(d.pontos) + ' de ' + d.whatsapp + '?\n\nMotivo: ' + motivo + '\n\nNão dá para desfazer (mas dá para dar pontos de volta depois).')) return;
+    await executarAjusteClube(-d.pontos, motivo);
+  }
+
+  async function executarAjusteClube(pontos, motivo) {
+    var res = await sb.rpc('clube_admin_ajustar', { p_whatsapp: clubeClienteAtual.whatsapp, p_pontos: pontos, p_motivo: motivo });
+    if (res.error || !res.data || res.data.success === false) {
+      showToast('Erro: ' + ((res.error && res.error.message) || (res.data && res.data.error) || 'falhou'), true);
+      return;
+    }
+    toast((pontos > 0 ? '+' : '') + pontosTxt(res.data.pontos) + ' · saldo ' + pontosTxt(res.data.saldo), 'green');
+    await buscarClienteClube();
+    carregarPainelClube();
+  }
+
+  window.carregarClube = carregarClube;
+  window.alternarClube = alternarClube;
+  window.atualizarPreviaClube = atualizarPreviaClube;
+  window.padraoClube = padraoClube;
+  window.salvarClube = salvarClube;
+  window.buscarClienteClube = buscarClienteClube;
+  window.ajustarClube = ajustarClube;
+  window.zerarClube = zerarClube;
 
   window.openOrderDetail = openOrderDetail;
   </script>
