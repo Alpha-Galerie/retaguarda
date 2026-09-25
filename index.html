@@ -2134,12 +2134,20 @@
           <h5>Endereço</h5>
           <div style="display:flex;align-items:flex-start;gap:8px;">
             <p id="mEndereco" style="flex:1;">—</p>
-            <button onclick="copiarCampo('mEndereco')" title="Copiar endereço"
-              style="background:none;border:1px solid var(--line);color:var(--text-dim);padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
-              onmouseenter="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
-              onmouseleave="this.style.borderColor='var(--line)';this.style.color='var(--text-dim)'">
-              📋 Copiar
-            </button>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+              <button onclick="copiarCampo('mEndereco')" title="Copiar endereço"
+                style="background:none;border:1px solid var(--line);color:var(--text-dim);padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
+                onmouseenter="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
+                onmouseleave="this.style.borderColor='var(--line)';this.style.color='var(--text-dim)'">
+                📋 Copiar
+              </button>
+              <button id="mImprimirEtiqueta" onclick="imprimirEtiqueta()" title="Imprimir etiqueta de entrega (número, nome e endereço)"
+                style="background:none;border:1px solid var(--gold);color:var(--gold);padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
+                onmouseenter="this.style.background='var(--gold)';this.style.color='#000'"
+                onmouseleave="this.style.background='none';this.style.color='var(--gold)'">
+                🖨 Imprimir
+              </button>
+            </div>
           </div>
         </div>
         <div class="detail-block">
@@ -4300,7 +4308,7 @@
     document.getElementById('mData').textContent = fmtDate(o.criado_em);
     document.getElementById('mCliente').textContent = o.cliente_nome || '—';
     document.getElementById('mContato').textContent = o.cliente_whatsapp || '—';
-    document.getElementById('mEndereco').textContent = o.cliente_endereco || '—';
+    document.getElementById('mEndereco').textContent = enderecoLimpo(o.cliente_endereco) || '—';
     document.getElementById('mObs').textContent = limparObservacoes(o.observacoes) || '—';
 
     var cleanW = (o.cliente_whatsapp || '').replace(/\D/g, '');
@@ -4783,7 +4791,7 @@
     if (p.tipo_entrega === 'retirada') {
       linhas.push('Retirada na loja.');
     } else if (p.cliente_endereco) {
-      linhas.push('Entrega em: ' + p.cliente_endereco);
+      linhas.push('Entrega em: ' + enderecoLimpo(p.cliente_endereco));
     }
 
     if (opts.cobranca) {
@@ -5097,6 +5105,81 @@
     });
     if (maior >= 100000) return String(maior + 1);
     return 'AG' + Date.now().toString().slice(-8);
+  }
+
+  // ============================================
+  // ETIQUETA DE ENTREGA (térmica 80 mm — Elgin i9)
+  // ============================================
+  // Os pedidos do site gravavam bairro, cidade, CEP e complemento duas vezes
+  // no endereço. Aqui sai cada trecho uma vez só. Número solto fica mesmo
+  // repetido: pode ser o da casa igual ao da rua ("Rua 10, 10").
+  function linhasEndereco(endereco) {
+    var vistos = {};
+    var partes = String(endereco || '').split(',').map(function(t) { return t.trim(); }).filter(function(t) {
+      if (!t) return false;
+      if (/^\d+$/.test(t)) return true;
+      var chave = t.toLowerCase();
+      if (vistos[chave]) return false;
+      vistos[chave] = true;
+      return true;
+    });
+    // Rua e número na mesma linha.
+    if (partes.length > 1 && /^(\d+[a-z]?|s\/?n)$/i.test(partes[1])) {
+      partes.splice(0, 2, partes[0] + ', ' + partes[1]);
+    }
+    return partes;
+  }
+
+  function enderecoLimpo(endereco) {
+    return linhasEndereco(endereco).join(', ');
+  }
+
+  function primeiroNome(nome) {
+    var p = String(nome || '').trim().split(/\s+/)[0] || '';
+    return p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '';
+  }
+
+  // Número do pedido, primeiro nome e endereço — sem telefone. Imprime por
+  // um iframe escondido: a página da retaguarda não muda e a bobina de 80 mm
+  // (72 mm úteis) recebe só a etiqueta.
+  function imprimirEtiqueta() {
+    var id = parseInt(document.getElementById('orderModal').dataset.orderId);
+    var o = allOrders.find(function(x) { return x.id === id; });
+    if (!o) return;
+    var linhas = linhasEndereco(o.cliente_endereco);
+    if (!linhas.length) { toast('Pedido sem endereço para imprimir', 'red'); return; }
+
+    var html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido #' + esc(o.numero) + '</title><style>' +
+      '@page { margin: 0; }' +
+      'html, body { margin: 0; padding: 0; background: #fff; }' +
+      'body { width: 72mm; padding: 3mm 2mm 6mm; box-sizing: border-box; color: #000;' +
+      ' font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; }' +
+      '.num { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; word-break: break-all; }' +
+      '.nome { font-size: 26px; font-weight: 800; margin: 2mm 0 2.5mm; line-height: 1.1; word-break: break-word; }' +
+      '.end div { font-size: 16px; font-weight: 700; line-height: 1.3; word-break: break-word; }' +
+      '</style></head><body>' +
+      '<div class="num">PEDIDO #' + esc(o.numero) + '</div>' +
+      '<div class="nome">' + esc(primeiroNome(o.cliente_nome)) + '</div>' +
+      '<div class="end">' + linhas.map(function(l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>' +
+      '</body></html>';
+
+    var frame = document.getElementById('etiquetaFrame');
+    if (!frame) {
+      frame = document.createElement('iframe');
+      frame.id = 'etiquetaFrame';
+      frame.setAttribute('aria-hidden', 'true');
+      frame.setAttribute('tabindex', '-1');
+      frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+      document.body.appendChild(frame);
+    }
+    var doc = frame.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    setTimeout(function() {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    }, 50);
   }
 
   function copiarCampo(fieldId) {
