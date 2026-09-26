@@ -2217,8 +2217,12 @@
               <input type="number" step="0.01" min="0" id="editFrete" oninput="recalcularTotaisEdicao()" />
             </div>
             <div class="totais-row">
-              <span class="lbl">Desconto</span>
+              <span class="lbl">Desconto <span style="color:var(--text-faint);font-size:9px;">(Pix, cupom)</span></span>
               <input type="number" step="0.01" min="0" id="editDesconto" oninput="recalcularTotaisEdicao()" />
+            </div>
+            <div class="totais-row" id="editPontosRow" style="display:none;">
+              <span class="lbl">Alpha Club (pontos)</span>
+              <span class="val mono" id="editPontos">−R$ 0,00</span>
             </div>
             <div class="totais-row grand">
               <span class="lbl">Total do pedido</span>
@@ -3138,8 +3142,18 @@
     return (txt ? txt + ' | ' : '') + marcador + valor;
   }
 
+  // Desconto do pedido, fora os pontos do Alpha Club (que têm linha e
+  // coluna próprias). O lançado aqui fica no marcador. O do site (5% do Pix,
+  // cupom) vem embutido no total: sem marcador, é o que falta para
+  // subtotal + frete − pontos chegar no total. Antes só o marcador contava,
+  // e editar itens ou a taxa de um pedido do site recalculava o total sem o
+  // desconto do Pix — o cliente passava a ser cobrado a mais.
   function getDescontoPedido(o) {
-    return num(lerMarcador(o && o.observacoes, 'DESCONTO_ADMIN=') || 0);
+    var marcado = lerMarcador(o && o.observacoes, 'DESCONTO_ADMIN=');
+    if (marcado !== null && marcado !== '') return num(marcado);
+    if (!o || num(o.subtotal) <= 0) return 0;
+    var embutido = num(o.subtotal) + num(o.frete) - num(o.cashback_usado) - num(o.total);
+    return embutido > 0.009 ? Number(embutido.toFixed(2)) : 0;
   }
 
   function fmt(v) {
@@ -4459,7 +4473,9 @@
       }),
       removidos: [],
       frete: num(o.frete),
-      desconto: getDescontoPedido(o)
+      desconto: getDescontoPedido(o),
+      pontos: num(o.cashback_usado),
+      totalAntes: num(o.total)
     };
 
     document.getElementById('mItens').style.display = 'none';
@@ -4480,6 +4496,9 @@
     document.getElementById('btnSalvarItens').style.display = '';
     document.getElementById('editFrete').value = pedidoEdicao.frete.toFixed(2);
     document.getElementById('editDesconto').value = pedidoEdicao.desconto.toFixed(2);
+    var pontosRow = document.getElementById('editPontosRow');
+    if (pontosRow) pontosRow.style.display = pedidoEdicao.pontos > 0 ? '' : 'none';
+    setText('editPontos', '−' + fmt(pedidoEdicao.pontos));
 
     renderEditItens();
   }
@@ -4639,8 +4658,11 @@
     }, 0);
     var frete = num(document.getElementById('editFrete') ? document.getElementById('editFrete').value : 0);
     var desconto = num(document.getElementById('editDesconto') ? document.getElementById('editDesconto').value : 0);
+    frete = Math.max(0, frete);
+    // Os pontos do Alpha Club já saíram do total no checkout; seguem valendo.
+    var pontos = pedidoEdicao ? pedidoEdicao.pontos : 0;
     desconto = Math.min(Math.max(0, desconto), subtotal + frete);
-    return { subtotal: subtotal, frete: Math.max(0, frete), desconto: desconto, total: subtotal + Math.max(0, frete) - desconto };
+    return { subtotal: subtotal, frete: frete, desconto: desconto, total: Math.max(0, subtotal + frete - desconto - pontos) };
   }
 
   function recalcularTotaisEdicao() {
@@ -4660,7 +4682,13 @@
     }
 
     var t = totaisEdicao();
-    if (!confirm('Salvar alterações no pedido #' + o.numero + '?\n\nNovo total: ' + fmt(t.total))) return;
+    var aviso = 'Salvar alterações no pedido #' + o.numero + '?\n\n' +
+      'Total antes: ' + fmt(pedidoEdicao.totalAntes) + '\nNovo total: ' + fmt(t.total);
+    // Total subindo sem item novo nem frete maior é sinal de desconto perdido.
+    if (t.total > pedidoEdicao.totalAntes + 0.009 && t.subtotal <= subtotalDoPedido(o) + 0.009 && t.frete <= num(o.frete) + 0.009) {
+      aviso += '\n\n⚠ O total subiu sem produto a mais nem frete maior. Confira o desconto.';
+    }
+    if (!confirm(aviso)) return;
 
     var btn = document.getElementById('btnSalvarItens');
     if (btn) { btn.disabled = true; btn.textContent = 'SALVANDO...'; }
@@ -4981,7 +5009,7 @@
     var frete = Math.max(0, num(document.getElementById('mFreteInput').value));
     var subtotal = subtotalDoPedido(o);
     var desconto = getDescontoPedido(o);
-    var total = Math.max(0, subtotal + frete - desconto);
+    var total = Math.max(0, subtotal + frete - desconto - num(o.cashback_usado));
 
     if (Number(frete.toFixed(2)) === Number(num(o.frete).toFixed(2))) {
       cancelarEdicaoFrete();
