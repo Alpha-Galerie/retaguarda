@@ -1158,13 +1158,7 @@
 
         <div class="filters-bar" style="align-items:center;flex-wrap:wrap;gap:8px;">
           <button class="filter-pill active" data-status="todos" onclick="filterStatus('todos')">Todos</button>
-          <button class="filter-pill" data-status="novo" onclick="filterStatus('novo')">Novos</button>
-          <button class="filter-pill" data-status="aguardando_pagamento" onclick="filterStatus('aguardando_pagamento')">Aguard. Pagamento</button>
-          <button class="filter-pill" data-status="nao_pago" onclick="filterStatus('nao_pago')">Não pago</button>
-          <button class="filter-pill" data-status="pago" onclick="filterStatus('pago')">Pagos</button>
-          <button class="filter-pill" data-status="enviado" onclick="filterStatus('enviado')">Enviados</button>
-          <button class="filter-pill" data-status="entregue" onclick="filterStatus('entregue')">Entregues</button>
-          <button class="filter-pill" data-status="cancelado" onclick="filterStatus('cancelado')">Cancelados</button>
+          <span id="statusFiltroPills" style="display:contents;"></span>
           <select id="canalFilter" onchange="renderOrders()" style="background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;">
             <option value="todos">Todos os canais</option>
             <option value="pdv">⭐ Club Alpha PDV</option>
@@ -1225,7 +1219,7 @@
             <div class="ops-icon" style="background:rgba(96,165,250,0.12);color:var(--blue);">✦</div>
             <div><div class="ops-num" style="color:var(--blue);" id="opsNovos">—</div><div class="ops-txt">Pedidos novos</div></div>
           </button>
-          <button class="ops-card" onclick="irParaPedidos('pago')">
+          <button class="ops-card" onclick="irParaPedidos('base:pago')">
             <div class="ops-icon" style="background:rgba(251,191,36,0.12);color:var(--orange);">▣</div>
             <div><div class="ops-num" style="color:var(--orange);" id="opsEnvioPendente">—</div><div class="ops-txt">Envio pendente</div></div>
           </button>
@@ -1794,6 +1788,40 @@
           </div>
         </div>
 
+        <!-- STATUS DOS PEDIDOS -->
+        <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">◆ STATUS DOS PEDIDOS</div>
+          <div style="font-size:10px;color:var(--text-faint);margin-bottom:18px;line-height:1.6;">
+            Crie, edite e exclua os status que aparecem nos pedidos. <b style="color:var(--text-dim);">"Conta como"</b> diz o que o
+            status vale para o resto do sistema: os que contam como <b style="color:var(--text-dim);">Pago, Enviado ou Entregue</b> entram no
+            faturamento e geram os pontos do Alpha Club; os que contam como <b style="color:var(--text-dim);">Cancelado</b> devolvem os pontos e o
+            cupom. Os status marcados "do site" são gravados pelo site e pelo Mercado Pago: dá para mudar nome, cor e ordem, mas não excluir.
+          </div>
+          <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:start;">
+            <div id="statusConfigLista"></div>
+            <div style="background:var(--bg);border:1px solid var(--line);padding:16px;">
+              <div id="statusFormTitulo" style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:12px;">NOVO STATUS</div>
+              <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">NOME</label>
+              <input type="text" id="statusNome" maxlength="40" placeholder="ex.: Aguardando coleta" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;margin-bottom:12px;" />
+              <div style="display:grid;grid-template-columns:80px 1fr;gap:12px;margin-bottom:12px;">
+                <div>
+                  <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">COR</label>
+                  <input type="color" id="statusCor" value="#c9a961" style="width:100%;height:40px;background:var(--bg-soft);border:1px solid var(--line);padding:2px;" />
+                </div>
+                <div>
+                  <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">CONTA COMO</label>
+                  <select id="statusContaComo" style="width:100%;height:40px;background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:0 10px;font-size:13px;"></select>
+                </div>
+              </div>
+              <label style="font-size:10px;letter-spacing:0.15em;color:var(--text-dim);display:block;margin-bottom:6px;">ORDEM <span style="color:var(--text-faint);">(menor aparece primeiro; vazio = no fim)</span></label>
+              <input type="number" id="statusOrdem" placeholder="ex.: 35" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:10px;font-size:13px;margin-bottom:14px;" />
+              <button onclick="salvarStatus()" style="width:100%;background:var(--gold);color:#000;border:none;padding:12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.15em;cursor:pointer;">SALVAR STATUS</button>
+              <button id="statusCancelar" onclick="limparFormStatus()" style="display:none;width:100%;margin-top:8px;background:transparent;color:var(--text-dim);border:1px solid var(--line);padding:10px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;cursor:pointer;">CANCELAR EDIÇÃO</button>
+              <div id="statusMsg" style="font-size:11px;margin-top:8px;color:var(--text-dim);"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- PIX DA LOJA -->
         <div style="background:var(--bg-soft);border:1px solid var(--line);padding:20px;margin-bottom:20px;">
           <div style="font-size:9px;letter-spacing:0.2em;color:var(--gold);margin-bottom:6px;">◆ PIX — COBRANÇA DOS PEDIDOS MANUAIS</div>
@@ -2263,14 +2291,7 @@
 
       <div class="detail-block">
         <h5>Status do pedido</h5>
-        <div class="status-controls">
-          <button class="filter-pill" data-mstatus="novo" onclick="updateOrderStatus('novo')">Novo</button>
-          <button class="filter-pill" data-mstatus="aguardando_pagamento" onclick="updateOrderStatus('aguardando_pagamento')">Aguard. Pagamento</button>
-          <button class="filter-pill" data-mstatus="pago" onclick="updateOrderStatus('pago')">Pago</button>
-          <button class="filter-pill" data-mstatus="enviado" onclick="updateOrderStatus('enviado')">Enviado</button>
-          <button class="filter-pill" data-mstatus="entregue" onclick="updateOrderStatus('entregue')">Entregue</button>
-          <button class="filter-pill" data-mstatus="cancelado" onclick="updateOrderStatus('cancelado')">Cancelado</button>
-        </div>
+        <div class="status-controls" id="mStatusBtns"></div>
       </div>
 
       <div class="form-actions">
@@ -2956,7 +2977,8 @@
   async function loadAll() {
     // Carrega categorias antes dos produtos para que o relacionamento/filtros funcionem corretamente.
     await loadCategories();
-    await Promise.all([loadOrders(), loadClients()]);
+    await Promise.all([carregarStatus(), loadOrders(), loadClients()]);
+    renderStatusControles();
     // A chave Pix é o que monta a cobrança do pedido manual. Sem isso,
     // quem nunca abriu a aba Config cairia na tela "Pix não configurado"
     // mesmo com a chave gravada.
@@ -3166,17 +3188,205 @@
     return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
+  // ============================================
+  // STATUS DOS PEDIDOS
+  // --------------------------------------------
+  // Vêm da tabela pedido_status e são editáveis em Config. Cada status diz
+  // como CONTA (conta_como): faturamento, pontos do Alpha Club e cupom
+  // devolvido no cancelamento olham essa base, não o nome. "Aguardando
+  // coleta", por exemplo, conta como pago. Se a tabela não carregar, vale
+  // a lista padrão abaixo e a retaguarda segue funcionando.
+  // ============================================
+  var STATUS_PADRAO = [
+    { slug: 'novo', nome: 'Novo', cor: '#60a5fa', conta_como: 'novo', ordem: 10, sistema: true },
+    { slug: 'pendente', nome: 'Pendente (site)', cor: '#f59e0b', conta_como: 'aguardando_pagamento', ordem: 15, sistema: true },
+    { slug: 'aguardando_pagamento', nome: 'Aguard. pagamento', cor: '#f59e0b', conta_como: 'aguardando_pagamento', ordem: 20, sistema: true },
+    { slug: 'nao_pago', nome: 'Não pago', cor: '#ef4444', conta_como: 'aguardando_pagamento', ordem: 25, sistema: true },
+    { slug: 'pago', nome: 'Pago', cor: '#fbbf24', conta_como: 'pago', ordem: 30, sistema: true },
+    { slug: 'enviado', nome: 'Enviado', cor: '#4ade80', conta_como: 'enviado', ordem: 40, sistema: true },
+    { slug: 'entregue', nome: 'Entregue', cor: '#888888', conta_como: 'entregue', ordem: 50, sistema: true },
+    { slug: 'cancelado', nome: 'Cancelado', cor: '#ef4444', conta_como: 'cancelado', ordem: 60, sistema: true },
+    { slug: 'recusado', nome: 'Recusado (cartão)', cor: '#ef4444', conta_como: 'cancelado', ordem: 65, sistema: true },
+    { slug: 'reembolsado', nome: 'Reembolsado', cor: '#ef4444', conta_como: 'cancelado', ordem: 70, sistema: true }
+  ];
+  var CONTA_COMO = [
+    { v: 'novo', nome: 'Novo' },
+    { v: 'aguardando_pagamento', nome: 'Aguardando pagamento' },
+    { v: 'pago', nome: 'Pago' },
+    { v: 'enviado', nome: 'Enviado' },
+    { v: 'entregue', nome: 'Entregue' },
+    { v: 'cancelado', nome: 'Cancelado' }
+  ];
+  var BASE_FATURADO = ['pago', 'enviado', 'entregue'];
+  var statusLista = STATUS_PADRAO.slice();
+  var statusEditando = null;
+
+  function statusInfo(s) {
+    for (var i = 0; i < statusLista.length; i++) if (statusLista[i].slug === s) return statusLista[i];
+    return null;
+  }
+  function statusBase(s) {
+    var i = statusInfo(s);
+    return i ? i.conta_como : s;
+  }
+  function ehFaturado(s) { return BASE_FATURADO.indexOf(statusBase(s)) >= 0; }
+  function slugsFaturados() {
+    var lista = statusLista.filter(function(i) { return BASE_FATURADO.indexOf(i.conta_como) >= 0; }).map(function(i) { return i.slug; });
+    BASE_FATURADO.forEach(function(b) { if (lista.indexOf(b) < 0) lista.push(b); });
+    return lista;
+  }
   function statusLabel(s) {
-    var map = {
-      novo: 'Novo',
-      aguardando_pagamento: 'Aguard. Pgto',
-      nao_pago: '⚠ Não pago',
-      pago: 'Pago',
-      enviado: 'Enviado',
-      entregue: 'Entregue',
-      cancelado: 'Cancelado'
-    };
-    return map[s] || s;
+    var i = statusInfo(s);
+    return i ? i.nome : (s || '—');
+  }
+  function corComAlfa(hex, a) {
+    var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return 'rgba(136,136,136,' + a + ')';
+    return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')';
+  }
+  function statusBadge(s) {
+    var i = statusInfo(s);
+    var cor = i ? i.cor : '#888888';
+    return '<span class="status-badge" style="color:' + cor + ';border-color:' + cor + ';background:' + corComAlfa(cor, 0.12) + ';">' + esc(statusLabel(s)) + '</span>';
+  }
+
+  async function carregarStatus() {
+    try {
+      var res = await sb.from('pedido_status').select('*').order('ordem', { ascending: true }).order('nome', { ascending: true });
+      if (res.error) throw res.error;
+      if (res.data && res.data.length) statusLista = res.data;
+    } catch (e) {
+      console.warn('Status dos pedidos: usando a lista padrão.', e);
+    }
+    renderStatusControles();
+  }
+
+  // Filtros da lista, botões do pedido aberto e a lista da Config.
+  function renderStatusControles() {
+    var pills = document.getElementById('statusFiltroPills');
+    if (pills) {
+      pills.innerHTML = statusLista.map(function(i) {
+        return '<button class="filter-pill' + (currentStatusFilter === i.slug ? ' active' : '') + '" data-status="' + esc(i.slug) + '" onclick="filterStatus(\'' + esc(i.slug) + '\')">' + esc(i.nome) + '</button>';
+      }).join('');
+    }
+    var btns = document.getElementById('mStatusBtns');
+    if (btns) {
+      var o = typeof pedidoAtualModal === 'function' ? pedidoAtualModal() : null;
+      btns.innerHTML = statusLista.map(function(i) {
+        return '<button class="filter-pill' + (o && o.status === i.slug ? ' active' : '') + '" data-mstatus="' + esc(i.slug) + '" onclick="updateOrderStatus(\'' + esc(i.slug) + '\')">' + esc(i.nome) + '</button>';
+      }).join('');
+    }
+    renderStatusConfig();
+  }
+
+  function renderStatusConfig() {
+    var box = document.getElementById('statusConfigLista');
+    if (!box) return;
+    var nomeBase = {};
+    CONTA_COMO.forEach(function(c) { nomeBase[c.v] = c.nome; });
+    box.innerHTML = statusLista.map(function(i) {
+      var emUso = (allOrders || []).filter(function(o) { return o.status === i.slug; }).length;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">' +
+        statusBadge(i.slug) +
+        '<span style="font-size:11px;color:var(--text-dim);flex:1;">conta como <b style="color:var(--text);">' + esc(nomeBase[i.conta_como] || i.conta_como) + '</b>' +
+          ' · ' + emUso + ' pedido' + (emUso === 1 ? '' : 's') +
+          (i.sistema ? ' · <span title="Usado pelo site e pelo Mercado Pago" style="color:var(--text-faint);">do site</span>' : '') + '</span>' +
+        '<button class="btn-mini" onclick="editarStatus(\'' + esc(i.slug) + '\')">EDITAR</button>' +
+        (i.sistema ? '' : '<button class="btn-mini" style="color:var(--red);border-color:var(--red);" onclick="excluirStatus(\'' + esc(i.slug) + '\')">EXCLUIR</button>') +
+      '</div>';
+    }).join('');
+    var sel = document.getElementById('statusContaComo');
+    if (sel && !sel.options.length) {
+      sel.innerHTML = CONTA_COMO.map(function(c) { return '<option value="' + c.v + '">' + esc(c.nome) + '</option>'; }).join('');
+    }
+  }
+
+  function slugDoNome(nome) {
+    return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  }
+
+  function limparFormStatus() {
+    statusEditando = null;
+    document.getElementById('statusNome').value = '';
+    document.getElementById('statusCor').value = '#c9a961';
+    document.getElementById('statusContaComo').value = 'pago';
+    document.getElementById('statusContaComo').disabled = false;
+    document.getElementById('statusOrdem').value = '';
+    document.getElementById('statusFormTitulo').textContent = 'NOVO STATUS';
+    document.getElementById('statusCancelar').style.display = 'none';
+    document.getElementById('statusMsg').textContent = '';
+  }
+
+  function editarStatus(slug) {
+    var i = statusInfo(slug);
+    if (!i) return;
+    statusEditando = slug;
+    document.getElementById('statusNome').value = i.nome;
+    document.getElementById('statusCor').value = i.cor;
+    document.getElementById('statusContaComo').value = i.conta_como;
+    // Status do site: o banco não deixa mudar como ele conta.
+    document.getElementById('statusContaComo').disabled = !!i.sistema;
+    document.getElementById('statusOrdem').value = i.ordem;
+    document.getElementById('statusFormTitulo').textContent = 'EDITANDO: ' + i.nome.toUpperCase();
+    document.getElementById('statusCancelar').style.display = '';
+    document.getElementById('statusMsg').textContent = i.sistema ? 'Status usado pelo site: dá para mudar nome, cor e ordem.' : '';
+    document.getElementById('statusNome').focus();
+  }
+
+  async function salvarStatus() {
+    var msg = document.getElementById('statusMsg');
+    var nome = document.getElementById('statusNome').value.trim();
+    var cor = document.getElementById('statusCor').value;
+    var conta = document.getElementById('statusContaComo').value;
+    var ordemTxt = document.getElementById('statusOrdem').value.trim();
+    if (!nome) { msg.style.color = 'var(--red)'; msg.textContent = 'Dê um nome ao status.'; return; }
+    var dados = { nome: nome, cor: cor };
+    var res;
+    if (statusEditando) {
+      var atual = statusInfo(statusEditando);
+      if (ordemTxt !== '') dados.ordem = parseInt(ordemTxt, 10) || 0;
+      if (atual && !atual.sistema) dados.conta_como = conta;
+      res = await sb.from('pedido_status').update(dados).eq('slug', statusEditando).select();
+    } else {
+      var slug = slugDoNome(nome);
+      if (slug.length < 2) { msg.style.color = 'var(--red)'; msg.textContent = 'Use um nome com pelo menos 2 letras.'; return; }
+      if (statusInfo(slug)) { msg.style.color = 'var(--red)'; msg.textContent = 'Já existe um status com esse nome.'; return; }
+      dados.slug = slug;
+      dados.conta_como = conta;
+      dados.ordem = ordemTxt !== '' ? (parseInt(ordemTxt, 10) || 0) : (statusLista.reduce(function(m, i) { return Math.max(m, i.ordem || 0); }, 0) + 5);
+      res = await sb.from('pedido_status').insert(dados).select();
+    }
+    if (res.error || !res.data || !res.data.length) {
+      msg.style.color = 'var(--red)';
+      msg.textContent = 'Não foi possível salvar: ' + ((res.error && res.error.message) || 'sem permissão.');
+      return;
+    }
+    await carregarStatus();
+    renderOrders();
+    limparFormStatus();
+    showToast('Status salvo ✓');
+  }
+
+  async function excluirStatus(slug) {
+    var i = statusInfo(slug);
+    if (!i || i.sistema) return;
+    var emUso = (allOrders || []).filter(function(o) { return o.status === slug; }).length;
+    if (emUso) {
+      showToast('Há ' + emUso + ' pedido(s) com "' + i.nome + '". Mude esses pedidos de status antes de excluir.', true);
+      return;
+    }
+    if (!confirm('Excluir o status "' + i.nome + '"?')) return;
+    var res = await sb.from('pedido_status').delete().eq('slug', slug).select();
+    if (res.error || !res.data || !res.data.length) {
+      showToast('Não foi possível excluir: ' + ((res.error && res.error.message) || 'sem permissão.'), true);
+      return;
+    }
+    if (currentStatusFilter === slug) currentStatusFilter = 'todos';
+    if (statusEditando === slug) limparFormStatus();
+    await carregarStatus();
+    renderOrders();
+    showToast('Status excluído ✓');
   }
 
   function getCanal(o) {
@@ -3567,6 +3777,7 @@
       carregarClube();
     }
     if (tab === 'configuracoes') {
+      renderStatusConfig();
       atualizarBotoesAlerta();
       carregarCupons();
       carregarLoja();
@@ -3584,7 +3795,7 @@
     var inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString();
     var novos = allOrders.filter(function(o) { return o.status === 'novo'; }).length;
     var doMes = allOrders.filter(function(o) { return o.criado_em >= inicioMes; });
-    var pagos = doMes.filter(function(o) { return ['pago','enviado','entregue'].includes(o.status); });
+    var pagos = doMes.filter(function(o) { return ehFaturado(o.status); });
     var fat = pagos.reduce(function(s,o) { return s + (o.total || 0); }, 0);
     var ticket = pagos.length ? fat / pagos.length : 0;
 
@@ -3604,9 +3815,9 @@
 
     var total = allOrders.length || 0;
     var started = total;
-    var paid = allOrders.filter(function(o){ return ['pago','enviado','entregue'].includes(o.status); }).length;
-    var shipped = allOrders.filter(function(o){ return ['enviado','entregue'].includes(o.status); }).length;
-    var delivered = allOrders.filter(function(o){ return o.status === 'entregue'; }).length;
+    var paid = allOrders.filter(function(o){ return ehFaturado(o.status); }).length;
+    var shipped = allOrders.filter(function(o){ return ['enviado','entregue'].indexOf(statusBase(o.status)) >= 0; }).length;
+    var delivered = allOrders.filter(function(o){ return statusBase(o.status) === 'entregue'; }).length;
 
     function pct(n){ return total ? Math.round((n/total)*100) : 0; }
 
@@ -3642,7 +3853,7 @@
       function avgForRange(days) {
         var since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
         var list = allOrders.filter(function(o) {
-          return paidStatuses.includes(o.status) && new Date(o.criado_em) >= since;
+          return ehFaturado(o.status) && new Date(o.criado_em) >= since;
         });
         var sum = list.reduce(function(s,o){ return s + (Number(o.total) || 0); }, 0);
         return list.length ? (sum / list.length) : 0;
@@ -3653,7 +3864,7 @@
       var mes = (function(){
         // média mensal: média dos últimos 12 meses (filtrando por 365 dias)
         var since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 365);
-        var list = allOrders.filter(function(o){ return paidStatuses.includes(o.status) && new Date(o.criado_em) >= since; });
+        var list = allOrders.filter(function(o){ return ehFaturado(o.status) && new Date(o.criado_em) >= since; });
         var sum = list.reduce(function(s,o){ return s + (Number(o.total) || 0); }, 0);
         return list.length ? (sum / list.length) : 0;
       })();
@@ -3668,7 +3879,7 @@
       for (var i=5;i>=0;i--) {
         var mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
         var mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-        var arr = allOrders.filter(function(o){ var d=new Date(o.criado_em); return paidStatuses.includes(o.status) && d >= mStart && d < mEnd; });
+        var arr = allOrders.filter(function(o){ var d=new Date(o.criado_em); return ehFaturado(o.status) && d >= mStart && d < mEnd; });
         var s = arr.reduce(function(acc,o){ return acc + (Number(o.total) || 0); }, 0);
         var avg = arr.length ? s / arr.length : 0;
         months.push(avg);
@@ -3745,7 +3956,7 @@
       var prodMap = {}, catMap = {}, receitaTotal = 0, unidadesTotal = 0;
 
       (allOrders || []).forEach(function(o) {
-        if (!STATUS_FATURADO.includes(o.status)) return;
+        if (!ehFaturado(o.status)) return;
         (getItensDoPedidoAdmin(o) || []).forEach(function(i) {
           var qtd = Number(i.quantidade || i.qtd || 1) || 1;
           var subtotal = num(i.subtotal || ((i.preco_unitario || i.preco || 0) * qtd));
@@ -3879,7 +4090,7 @@
     montarIndiceProdutos();
     var mapa = {};
     (allOrders || []).forEach(function(o) {
-      if (!STATUS_FATURADO.includes(o.status)) return;
+      if (!ehFaturado(o.status)) return;
       (getItensDoPedidoAdmin(o) || []).forEach(function(i) {
         if (produtoDoItem(i)) return;               // já resolve pelo catálogo
         var nome = i.produto_nome || i.nome;
@@ -4264,7 +4475,10 @@
 
   function renderOrders() {
     var list = allOrders.slice();
-    if (currentStatusFilter !== 'todos') {
+    if (currentStatusFilter.indexOf('base:') === 0) {
+      var baseFiltro = currentStatusFilter.slice(5);
+      list = list.filter(function(o) { return statusBase(o.status) === baseFiltro; });
+    } else if (currentStatusFilter !== 'todos') {
       list = list.filter(function(o) { return o.status === currentStatusFilter; });
     }
     if (currentSearch) {
@@ -4301,7 +4515,7 @@
         '<td><div class="order-cli">' + o.cliente_nome + '<small>' + (o.cliente_whatsapp || '') + '</small></div></td>' +
         '<td><div>' + itens + ' itens</div><small class="mono" style="color:var(--text-faint)">' + (o.tipo_entrega === 'retirada' ? '🏪' : '🛵') + ' ' + pag + '</small></td>' +
         '<td><div class="order-total">' + fmt(o.total) + '</div></td>' +
-        '<td><span class="status-badge st-' + o.status + '">' + statusLabel(o.status) + '</span></td>' +
+        '<td>' + statusBadge(o.status) + '</td>' +
         '<td><span style="color:var(--text-faint);font-size:11px;">VER →</span></td>' +
         '</tr>';
     }).join('');
@@ -4404,7 +4618,7 @@
       return;
     }
 
-    var gasto = anteriores.concat([o]).filter(function(x) { return x.status !== 'cancelado'; })
+    var gasto = anteriores.concat([o]).filter(function(x) { return statusBase(x.status) !== 'cancelado'; })
       .reduce(function(s, x) { return s + num(x.total); }, 0);
 
     el.innerHTML = '<div class="mono" style="color:var(--text-faint);font-size:10px;margin-bottom:10px;">' +
@@ -4423,7 +4637,13 @@
   function updateOrderStatus(status) {
     var id = parseInt(document.getElementById('orderModal').dataset.orderId);
     if (!id) return;
-    sb.from('pedidos').update({ status: status }).eq('id', id).then(function() {
+    sb.from('pedidos').update({ status: status }).eq('id', id).select('id').then(function(res) {
+      // Antes o "atualizado" aparecia mesmo quando o banco recusava, e o
+      // status voltava ao recarregar a tela.
+      if (res.error || !res.data || !res.data.length) {
+        showToast('Não foi possível mudar o status: ' + ((res.error && res.error.message) || 'sem permissão.'), true);
+        return;
+      }
       var o = allOrders.find(function(x) { return x.id === id; });
       if (o) o.status = status;
       renderOrders();
@@ -4884,7 +5104,7 @@
 
     pixPedidoAtual = '';
 
-    if (!o || STATUS_QUITADO.indexOf(o.status) >= 0) {
+    if (!o || STATUS_QUITADO.indexOf(statusBase(o.status)) >= 0) {
       bloco.style.display = 'none';
       return;
     }
@@ -5902,7 +6122,7 @@
       if (!c.endereco && o.cliente_endereco) c.endereco = o.cliente_endereco;
       if (c.nome === '—' && o.cliente_nome) c.nome = o.cliente_nome;
       c.pedidos.push(o);
-      if (o.status !== 'cancelado') c.total += Number(o.total) || 0;
+      if (statusBase(o.status) !== 'cancelado') c.total += Number(o.total) || 0;
       if (!c.ultimo || o.criado_em > c.ultimo) c.ultimo = o.criado_em;
       if (!c.primeiro || o.criado_em < c.primeiro) c.primeiro = o.criado_em;
       if (!c.cadastro || (c.primeiro && c.primeiro < c.cadastro)) c.cadastro = c.primeiro;
@@ -6051,7 +6271,7 @@
     // Produtos mais comprados por este cliente
     var contagem = {};
     c.pedidos.forEach(function(o) {
-      if (o.status === 'cancelado') return;
+      if (statusBase(o.status) === 'cancelado') return;
       getItensDoPedidoAdmin(o).forEach(function(i) {
         var nome = i.produto_nome || i.nome || 'Produto';
         var qtd = Number(i.quantidade || i.qtd || 0);
@@ -6078,7 +6298,7 @@
     return '<div class="hist-row">' +
       '<div class="hist-main"><strong>#' + esc(o.numero) + '</strong> · ' + fmt(o.total) +
         '<small>' + fmtDate(o.criado_em) + ' · ' + itens + ' itens</small></div>' +
-      '<span class="status-badge st-' + o.status + '">' + statusLabel(o.status) + '</span>' +
+      statusBadge(o.status) +
       '<button class="btn-mini" onclick="event.stopPropagation();abrirPedidoDoHistorico(' + o.id + ')">ABRIR</button>' +
       (comRepetir ? '<button class="btn-mini gold" onclick="event.stopPropagation();repetirPedido(' + o.id + ')">🔁 REPETIR</button>' : '') +
       '</div>';
@@ -6175,12 +6395,12 @@
   }
 
   function resumoPedidos(lista) {
-    var faturados = lista.filter(function(o) { return STATUS_FATURADO.includes(o.status); });
+    var faturados = lista.filter(function(o) { return ehFaturado(o.status); });
     var receita = faturados.reduce(function(s, o) { return s + num(o.total); }, 0);
     var itens = faturados.reduce(function(s, o) {
       return s + getItensDoPedidoAdmin(o).reduce(function(a, i) { return a + Number(i.quantidade || i.qtd || 0); }, 0);
     }, 0);
-    var cancelados = lista.filter(function(o) { return o.status === 'cancelado'; }).length;
+    var cancelados = lista.filter(function(o) { return statusBase(o.status) === 'cancelado'; }).length;
     var clientes = {};
     faturados.forEach(function(o) { clientes[chaveCliente(o.cliente_nome, o.cliente_whatsapp, o.cliente_email)] = 1; });
     return {
@@ -6209,7 +6429,7 @@
     var contaStatus = function(st) { return allOrders.filter(function(o) { return o.status === st; }).length; };
     setText('opsPagPendente', contaStatus('aguardando_pagamento'));
     setText('opsNovos', contaStatus('novo'));
-    setText('opsEnvioPendente', contaStatus('pago'));
+    setText('opsEnvioPendente', allOrders.filter(function(o) { return statusBase(o.status) === 'pago'; }).length);
     setText('opsEmTransito', contaStatus('enviado'));
     setText('opsNaoPago', contaStatus('nao_pago'));
 
@@ -6257,7 +6477,7 @@
         d.setMonth(d.getMonth() - m);
         var chave = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         var doMes = allOrders.filter(function(o) {
-          return STATUS_FATURADO.includes(o.status) && String(o.criado_em || '').slice(0, 7) === chave;
+          return ehFaturado(o.status) && String(o.criado_em || '').slice(0, 7) === chave;
         });
         labels.push(d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''));
         valores.push(Math.round(doMes.reduce(function(s, o) { return s + num(o.total); }, 0)));
@@ -6269,7 +6489,7 @@
         var prox = new Date(dia.getTime() + 86400000);
         var doDia = allOrders.filter(function(o) {
           var dt = new Date(o.criado_em);
-          return STATUS_FATURADO.includes(o.status) && dt >= dia && dt < prox;
+          return ehFaturado(o.status) && dt >= dia && dt < prox;
         });
         labels.push(dia.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
         valores.push(Math.round(doDia.reduce(function(s, o) { return s + num(o.total); }, 0)));
@@ -6346,7 +6566,7 @@
 
   function renderStatusResumo(r) {
     var lista = pedidosNoIntervalo(r.ini, r.fim);
-    var ordem = ['novo', 'aguardando_pagamento', 'nao_pago', 'pago', 'enviado', 'entregue', 'cancelado'];
+    var ordem = statusLista.map(function(i) { return i.slug; });
     var total = lista.length;
     setHTML('statusResumo', total
       ? ordem.map(function(st) {
@@ -6355,7 +6575,7 @@
           var p = Math.round((qtd / total) * 100);
           return '<div style="margin-bottom:10px;">' +
             '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">' +
-              '<span class="status-badge st-' + st + '">' + statusLabel(st) + '</span>' +
+              statusBadge(st) +
               '<span class="mono" style="color:var(--text-dim);">' + qtd + ' · ' + p + '%</span></div>' +
             '<div style="background:var(--bg);border:1px solid var(--line);height:6px;border-radius:4px;overflow:hidden;">' +
               '<div style="height:100%;width:' + p + '%;background:var(--gold);"></div></div>' +
@@ -6422,7 +6642,7 @@
     var acc = {};
 
     (allOrders || []).forEach(function(o) {
-      if (!STATUS_FATURADO.includes(o.status)) return;
+      if (!ehFaturado(o.status)) return;
       var k = chaveCliente(o.cliente_nome, o.cliente_whatsapp, o.cliente_email);
       if (!acc[k]) {
         acc[k] = { chave: k, nome: o.cliente_nome || '—', whatsapp: o.cliente_whatsapp || '',
@@ -6509,7 +6729,7 @@
             '<td>' + esc(o.cliente_nome || '—') + '</td>' +
             '<td>' + itens + '</td>' +
             '<td class="blur-lock" style="color:var(--gold);">' + fmt(o.total) + '</td>' +
-            '<td><span class="status-badge st-' + o.status + '">' + statusLabel(o.status) + '</span></td>' +
+            '<td>' + statusBadge(o.status) + '</td>' +
             '</tr>';
         }).join('')
       : '<tr><td colspan="5" style="color:var(--text-faint);font-size:11px;padding:16px 10px;">Nenhum pedido ainda.</td></tr>';
@@ -6564,7 +6784,7 @@
       var doze = new Date();
       doze.setMonth(doze.getMonth() - 11);
       doze.setDate(1);
-      var res = await sb.from('pedidos').select('total,criado_em').gte('criado_em', doze.toISOString()).in('status', ['pago','enviado','entregue']);
+      var res = await sb.from('pedidos').select('total,criado_em').gte('criado_em', doze.toISOString()).in('status', slugsFaturados());
       var meses = [];
       for (var i = 0; i < 12; i++) {
         var d = new Date();
