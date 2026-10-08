@@ -375,6 +375,36 @@
       letter-spacing: 0.18em; text-transform: uppercase;
       border: 1px solid;
     }
+    /* Etiqueta de status que também é o seletor: muda o status sem abrir o pedido. */
+    .status-select {
+      appearance: none; -webkit-appearance: none;
+      padding: 5px 24px 5px 10px;
+      border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      border: 1px solid;
+      cursor: pointer;
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      background-size: 8px 5px;
+      max-width: 100%;
+    }
+    .status-select:disabled { opacity: 0.5; cursor: wait; }
+    .status-select option { background: var(--bg-soft); color: var(--text); text-transform: none; letter-spacing: 0; }
+    th.col-check, td.col-check { width: 34px; padding-left: 14px; padding-right: 4px; text-align: center; }
+    .col-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--gold); }
+    .bulk-bar {
+      display: none; align-items: center; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 10px; padding: 10px 14px;
+      border: 1px solid var(--gold); background: rgba(201,169,97,0.08);
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text);
+    }
+    .bulk-bar.show { display: flex; }
+    .bulk-bar select {
+      background: var(--bg-soft); border: 1px solid var(--line); color: var(--text);
+      padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    }
     .st-novo { color: var(--blue); border-color: var(--blue); background: rgba(96,165,250,0.1); }
     .st-aguardando_pagamento { color: #f59e0b; border-color: #f59e0b; background: rgba(245,158,11,0.1); }
     .st-nao_pago { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.15); font-weight:700; }
@@ -1168,10 +1198,19 @@
           <input type="text" class="search-input" placeholder="Buscar por nome, número ou WhatsApp..." id="searchInput" oninput="filterSearch()" style="flex:1;min-width:200px;" />
         </div>
 
+        <div class="bulk-bar" id="bulkBar">
+          <span id="bulkCount"></span>
+          <span style="color:var(--text-dim);">→ mudar para</span>
+          <select id="bulkStatus"></select>
+          <button class="btn-mini gold" id="bulkAplicar" onclick="aplicarStatusEmMassa()">APLICAR</button>
+          <button class="btn-mini" onclick="limparSelecaoPedidos()">LIMPAR SELEÇÃO</button>
+        </div>
+
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th class="col-check"><input type="checkbox" id="checkTodosPedidos" title="Marcar todos os pedidos da lista" onclick="marcarTodosPedidos(this.checked)" /></th>
                 <th>Pedido</th>
                 <th>Cliente</th>
                 <th>Itens</th>
@@ -1181,7 +1220,7 @@
               </tr>
             </thead>
             <tbody id="ordersBody">
-              <tr><td colspan="6" class="empty-table"><h4>Carregando...</h4></td></tr>
+              <tr><td colspan="7" class="empty-table"><h4>Carregando...</h4></td></tr>
             </tbody>
           </table>
         </div>
@@ -4495,8 +4534,10 @@
 
     var body = document.getElementById('ordersBody');
     if (!body) return;
+    pedidosVisiveis = list.map(function(o) { return o.id; });
+    renderBulkBar();
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Nenhum pedido</h4></td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="empty-table"><h4>Nenhum pedido</h4></td></tr>';
       return;
     }
 
@@ -4511,11 +4552,12 @@
       var pagMap = { pix: '◆ Pix', cartao: '▣ Cartão', dinheiro: '$ Dinheiro', pagar_retirada: '⬡ Retirada' };
       var pag = pagMap[o.forma_pagamento] || o.forma_pagamento || '—';
       return '<tr onclick="openOrderDetail(' + o.id + ')" style="cursor:pointer;">' +
+        '<td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" title="Selecionar para mudar o status em massa"' + (pedidosSelecionados[o.id] ? ' checked' : '') + ' onchange="marcarPedido(' + o.id + ', this.checked)" /></td>' +
         '<td><div class="order-num">#' + o.numero + '</div><div class="order-date">' + fmtDate(o.criado_em) + '</div><div style="margin-top:4px;">' + canalBadge + '</div></td>' +
         '<td><div class="order-cli">' + o.cliente_nome + '<small>' + (o.cliente_whatsapp || '') + '</small></div></td>' +
         '<td><div>' + itens + ' itens</div><small class="mono" style="color:var(--text-faint)">' + (o.tipo_entrega === 'retirada' ? '🏪' : '🛵') + ' ' + pag + '</small></td>' +
         '<td><div class="order-total">' + fmt(o.total) + '</div></td>' +
-        '<td>' + statusBadge(o.status) + '</td>' +
+        '<td onclick="event.stopPropagation()">' + statusSelect(o) + '</td>' +
         '<td><span style="color:var(--text-faint);font-size:11px;">VER →</span></td>' +
         '</tr>';
     }).join('');
@@ -4634,27 +4676,130 @@
     openClientDetail(chaveCliente(o.cliente_nome, o.cliente_whatsapp, o.cliente_email));
   }
 
+  // Muda o status de um ou mais pedidos no banco e na lista. Resolve com a
+  // quantidade que o banco aceitou. Antes o "atualizado" aparecia mesmo
+  // quando o banco recusava, e o status voltava ao recarregar a tela.
+  function mudarStatusPedidos(ids, status) {
+    return sb.from('pedidos').update({ status: status }).in('id', ids).select('id').then(function(res) {
+      if (res.error || !res.data || !res.data.length) {
+        showToast('Não foi possível mudar o status: ' + ((res.error && res.error.message) || 'sem permissão.'), true);
+        return 0;
+      }
+      res.data.forEach(function(r) {
+        var o = allOrders.find(function(x) { return x.id === r.id; });
+        if (o) o.status = status;
+      });
+      renderOrders();
+      return res.data.length;
+    });
+  }
+
   function updateOrderStatus(status) {
     var id = parseInt(document.getElementById('orderModal').dataset.orderId);
     if (!id) return;
-    sb.from('pedidos').update({ status: status }).eq('id', id).select('id').then(function(res) {
-      // Antes o "atualizado" aparecia mesmo quando o banco recusava, e o
-      // status voltava ao recarregar a tela.
-      if (res.error || !res.data || !res.data.length) {
-        showToast('Não foi possível mudar o status: ' + ((res.error && res.error.message) || 'sem permissão.'), true);
-        return;
-      }
-      var o = allOrders.find(function(x) { return x.id === id; });
-      if (o) o.status = status;
-      renderOrders();
+    mudarStatusPedidos([id], status).then(function(n) {
+      if (!n) return;
       // Marcou como pago: a cobrança some da tela na hora. Deixá-la ali
       // é convite a cobrar o cliente duas vezes.
-      renderCobrancaPedido(o);
+      renderCobrancaPedido(allOrders.find(function(x) { return x.id === id; }));
       // Atualizar botões no modal
       document.querySelectorAll('[data-mstatus]').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.mstatus === status);
       });
       showToast('Status atualizado ✓');
+    });
+  }
+
+  // ---- Status direto na lista (sem abrir o pedido) ----
+  var pedidosSelecionados = {};
+  var pedidosVisiveis = [];
+
+  function opcoesStatus(atual) {
+    var lista = statusLista.slice();
+    // Status antigo que saiu da lista: continua aparecendo para não sumir.
+    if (atual && !statusInfo(atual)) lista.push({ slug: atual, nome: atual });
+    return lista.map(function(i) {
+      return '<option value="' + esc(i.slug) + '"' + (i.slug === atual ? ' selected' : '') + '>' + esc(i.nome) + '</option>';
+    }).join('');
+  }
+
+  function statusSelect(o) {
+    var i = statusInfo(o.status);
+    var cor = i ? i.cor : '#888888';
+    var seta = "url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='" + encodeURIComponent(cor) + "'/%3E%3C/svg%3E&quot;)";
+    return '<select class="status-select" title="Mudar o status deste pedido" ' +
+      'style="color:' + cor + ';border-color:' + cor + ';background-color:' + corComAlfa(cor, 0.12) + ';background-image:' + seta + ';" ' +
+      'onchange="mudarStatusLista(' + o.id + ', this)">' + opcoesStatus(o.status) + '</select>';
+  }
+
+  function mudarStatusLista(id, sel) {
+    var o = allOrders.find(function(x) { return x.id === id; });
+    var anterior = o ? o.status : null;
+    var novo = sel.value;
+    if (novo === anterior) return;
+    sel.disabled = true;
+    mudarStatusPedidos([id], novo).then(function(n) {
+      if (n) {
+        showToast('#' + (o ? o.numero : id) + ' → ' + statusLabel(novo) + ' ✓');
+      } else {
+        // O banco recusou: a etiqueta volta para o status de verdade.
+        renderOrders();
+      }
+    });
+  }
+
+  function marcarPedido(id, marcado) {
+    if (marcado) pedidosSelecionados[id] = true;
+    else delete pedidosSelecionados[id];
+    renderBulkBar();
+  }
+
+  function marcarTodosPedidos(marcado) {
+    pedidosVisiveis.forEach(function(id) { marcarPedido(id, marcado); });
+    renderOrders();
+  }
+
+  function limparSelecaoPedidos() {
+    pedidosSelecionados = {};
+    renderOrders();
+  }
+
+  function idsSelecionados() {
+    // Só conta o que está na tela: um filtro novo não leva pedidos escondidos junto.
+    return pedidosVisiveis.filter(function(id) { return pedidosSelecionados[id]; });
+  }
+
+  function renderBulkBar() {
+    var bar = document.getElementById('bulkBar');
+    if (!bar) return;
+    var ids = idsSelecionados();
+    bar.classList.toggle('show', ids.length > 0);
+    var todos = document.getElementById('checkTodosPedidos');
+    if (todos) {
+      todos.checked = ids.length > 0 && ids.length === pedidosVisiveis.length;
+      todos.indeterminate = ids.length > 0 && ids.length < pedidosVisiveis.length;
+    }
+    if (!ids.length) return;
+    setText('bulkCount', ids.length + (ids.length === 1 ? ' pedido selecionado' : ' pedidos selecionados'));
+    var sel = document.getElementById('bulkStatus');
+    var escolhido = sel.value;
+    sel.innerHTML = opcoesStatus(null);
+    if (escolhido) sel.value = escolhido;
+  }
+
+  function aplicarStatusEmMassa() {
+    var ids = idsSelecionados();
+    var status = document.getElementById('bulkStatus').value;
+    if (!ids.length || !status) return;
+    if (!confirm('Mudar ' + ids.length + (ids.length === 1 ? ' pedido' : ' pedidos') + ' para "' + statusLabel(status) + '"?')) return;
+    var btn = document.getElementById('bulkAplicar');
+    btn.disabled = true;
+    mudarStatusPedidos(ids, status).then(function(n) {
+      btn.disabled = false;
+      if (!n) return;
+      pedidosSelecionados = {};
+      renderOrders();
+      showToast(n + (n === 1 ? ' pedido' : ' pedidos') + ' → ' + statusLabel(status) + ' ✓');
     });
   }
 
