@@ -1375,6 +1375,60 @@
           </div>
         </div>
 
+        <!-- O QUE ESTÃO PROCURANDO -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>O que estão <em>procurando</em></span>
+            <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <span class="mono" style="color:var(--text-faint);" id="interessesResumo"></span>
+              <button class="btn-mini gold" onclick="exportarInteressesCSV()">⬇ CSV</button>
+            </span>
+          </div>
+          <div class="mono" style="color:var(--text-faint);font-size:10px;margin-bottom:16px;" id="interessesAviso"></div>
+
+          <div class="panel-grid-2" style="margin-bottom:24px;">
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">🔥 INTERESSE POR TIPO DE PRODUTO</div>
+              <div id="interessesPorTipo"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+              <div class="mono" style="color:var(--text-faint);font-size:10px;margin-top:8px;">Soma de buscas + produtos abertos + categorias clicadas</div>
+            </div>
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">🔎 O QUE DIGITAM NA BUSCA</div>
+              <div id="interessesBuscas"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+            </div>
+          </div>
+
+          <div class="panel-grid-2">
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">👀 PRODUTOS MAIS OLHADOS × VENDIDOS</div>
+              <div id="interessesProdutos"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+              <div class="mono" style="color:var(--text-faint);font-size:10px;margin-top:8px;">🏷 = muita gente olhando e pouca comprando: candidato a promoção</div>
+            </div>
+            <div>
+              <div class="mono" style="color:var(--red);font-size:10px;margin-bottom:10px;">🚫 BUSCARAM E NÃO ACHARAM</div>
+              <div id="interessesSemResultado"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+              <div class="mono" style="color:var(--text-faint);font-size:10px;margin-top:8px;">Demanda que a loja não está atendendo: vale cadastrar ou comprar</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAIRROS E ZONAS -->
+        <div class="panel">
+          <div class="panel-title"><span>Bairros e <em>zonas</em></span>
+            <span class="mono" style="color:var(--text-faint);">para campanha por região</span>
+          </div>
+          <div class="panel-grid-2">
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">🏠 BAIRROS DOS PEDIDOS <span style="color:var(--text-faint);">(endereço de entrega · histórico)</span></div>
+              <div id="bairrosPedidos"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+            </div>
+            <div>
+              <div class="mono" style="color:var(--gold);font-size:10px;margin-bottom:10px;">🗺 ZONA DE QUEM VISITA <span style="color:var(--text-faint);">(aproximada pelo CEP do IP)</span></div>
+              <div id="zonasVisitas"><div style="color:var(--text-faint);font-size:11px;">Carregando...</div></div>
+            </div>
+          </div>
+        </div>
+
         <!-- VISITAS + CIDADES + LEADS -->
         <div class="panel">
           <div class="panel-title">
@@ -6825,6 +6879,7 @@
   }
 
   async function carregarVisitas() {
+    carregarInteresses();
     try {
       var r = getPerfRange();
       var res = await sb.rpc('painel_visitas', { p_dias: r.dias });
@@ -6979,6 +7034,132 @@
       ]);
     });
     baixarCSV(linhas, 'visitas-por-dia-' + visitasDados.inicio + '_a_' + visitasDados.fim + '.csv');
+  }
+
+  // ============================================
+  // O QUE ESTÃO PROCURANDO + BAIRROS
+  // --------------------------------------------
+  // O site grava em interesses_site cada busca, categoria/subcategoria
+  // clicada e produto aberto. painel_interesses agrega no banco: tipo de
+  // produto (seda, tabaco, essência...), termos buscados, buscas sem
+  // resultado, produtos olhados × vendidos, zona por CEP e bairros tirados
+  // do endereço de entrega dos pedidos.
+  // ============================================
+  var interessesDados = null;
+
+  async function carregarInteresses() {
+    try {
+      var r = getPerfRange();
+      var res = await sb.rpc('painel_interesses', { p_dias: r.dias });
+      if (res.error) {
+        console.warn('painel_interesses:', res.error.message);
+        avisarSeSemPermissao(res.error, 'interesses');
+        return;
+      }
+      interessesDados = res.data;
+      renderInteresses();
+    } catch (e) {
+      console.warn('Erro ao carregar interesses:', e);
+    }
+  }
+
+  function barraRanking(nome, sub, valor, max, cor) {
+    var p = max ? Math.round((valor / max) * 100) : 0;
+    return '<div style="margin-bottom:10px;">' +
+      '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;gap:8px;">' +
+        '<span>' + nome + '</span>' +
+        '<span class="mono" style="color:var(--text-dim);white-space:nowrap;">' + sub + '</span></div>' +
+      '<div style="background:var(--bg);border:1px solid var(--line);height:6px;border-radius:4px;overflow:hidden;">' +
+        '<div style="height:100%;width:' + p + '%;background:' + (cor || 'var(--gold)') + ';"></div></div>' +
+      '</div>';
+  }
+
+  var SEM_DADOS = '<div style="color:var(--text-faint);font-size:11px;">Sem dados no período</div>';
+
+  function renderInteresses() {
+    var d = interessesDados;
+    if (!d) return;
+    var res = d.resumo || {};
+
+    setText('interessesResumo', res.buscas + ' buscas · ' + res.sessoes_busca + ' pessoas · ' +
+      res.produtos_vistos + ' produtos abertos');
+    setHTML('interessesAviso', res.desde
+      ? 'Coletando desde ' + new Date(res.desde).toLocaleDateString('pt-BR') + '.'
+      : 'A coleta começa assim que a nova versão do site for publicada — os números aparecem aqui conforme os clientes navegam.');
+
+    var tipos = (d.por_tipo || []).filter(function(x) { return x.grupo !== 'Outros'; })
+      .concat((d.por_tipo || []).filter(function(x) { return x.grupo === 'Outros'; }));
+    var maxT = Math.max.apply(null, tipos.map(function(x) { return x.total; }).concat([1]));
+    setHTML('interessesPorTipo', tipos.length
+      ? tipos.map(function(x, i) {
+          return barraRanking((i === 0 ? '🔥 ' : '') + esc(x.grupo),
+            x.total + ' · ' + x.pessoas + ' pessoas', x.total, maxT, i === 0 ? 'var(--green)' : 'var(--gold)');
+        }).join('')
+      : SEM_DADOS);
+
+    var buscas = d.buscas_top || [];
+    setHTML('interessesBuscas', buscas.length
+      ? buscas.slice(0, 15).map(function(b, i) {
+          return '<div class="rank-row"><div class="rank-pos">' + (i + 1) + '</div>' +
+            '<div class="rank-name">"' + esc(b.termo) + '"<small>' + esc(b.grupo) + ' · ' +
+              (b.resultados === 0 ? '<span style="color:var(--red);">0 resultados</span>' : (b.resultados == null ? '' : b.resultados + ' resultados')) +
+            '</small></div>' +
+            '<div class="rank-val">' + b.vezes + '×</div></div>';
+        }).join('')
+      : SEM_DADOS);
+
+    var prods = d.produtos_top || [];
+    setHTML('interessesProdutos', prods.length
+      ? prods.slice(0, 12).map(function(p, i) {
+          var promo = p.pessoas >= 5 && p.vendidos * 5 < p.pessoas;
+          return '<div class="rank-row"><div class="rank-pos">' + (i + 1) + '</div>' +
+            '<div class="rank-name">' + (promo ? '🏷 ' : '') + esc(p.nome || ('Produto #' + p.produto_id)) +
+              '<small>' + esc(p.grupo) + ' · ' + p.pessoas + ' pessoas · vendeu ' + p.vendidos + '</small></div>' +
+            '<div class="rank-val">' + p.vistas + '</div></div>';
+        }).join('')
+      : SEM_DADOS);
+
+    var sem = d.buscas_sem_resultado || [];
+    setHTML('interessesSemResultado', sem.length
+      ? sem.map(function(b) {
+          return '<div class="rank-row"><div class="rank-name">"' + esc(b.termo) + '"</div>' +
+            '<div class="rank-val" style="color:var(--red);">' + b.vezes + '×</div></div>';
+        }).join('')
+      : '<div style="color:var(--text-faint);font-size:11px;">Nenhuma busca sem resultado no período 👍</div>');
+
+    var bairros = d.bairros_pedidos || [];
+    setHTML('bairrosPedidos', bairros.length
+      ? bairros.slice(0, 12).map(function(b, i) {
+          return '<div class="rank-row"><div class="rank-pos">' + (i + 1) + '</div>' +
+            '<div class="rank-name">' + esc(b.bairro) + '<small>' + esc(b.cidade || '') +
+              ' · ' + b.pagos + ' pago' + (b.pagos === 1 ? '' : 's') +
+              ' · <span class="blur-lock">' + fmt(b.receita) + '</span></small></div>' +
+            '<div class="rank-val">' + b.pedidos + '</div></div>';
+        }).join('')
+      : SEM_DADOS);
+
+    var zonas = d.zonas || [];
+    var maxZ = Math.max.apply(null, zonas.map(function(z) { return z.visitas; }).concat([1]));
+    setHTML('zonasVisitas', zonas.length
+      ? zonas.map(function(z) {
+          var capital = /^SP Capital/.test(z.zona);
+          return barraRanking(esc(z.zona), z.visitas + ' visitas', z.visitas, maxZ, capital ? 'var(--blue)' : 'var(--gold)');
+        }).join('')
+      : '<div style="color:var(--text-faint);font-size:11px;">O CEP aproximado passa a ser coletado com a nova versão do site. Até lá, use a lista de bairros dos pedidos ao lado.</div>');
+    aplicarBlurLock();
+  }
+
+  function exportarInteressesCSV() {
+    var d = interessesDados;
+    if (!d) { showToast('Nada para exportar', true); return; }
+    var linhas = [['Tipo', 'Item', 'Grupo', 'Quantidade', 'Pessoas', 'Detalhe']];
+    (d.por_tipo || []).forEach(function(x) { linhas.push(['Tipo de produto', x.grupo, x.grupo, x.total, x.pessoas, x.buscas + ' buscas / ' + x.produtos + ' produtos / ' + x.categorias + ' categorias']); });
+    (d.buscas_top || []).forEach(function(x) { linhas.push(['Busca', x.termo, x.grupo, x.vezes, x.pessoas, (x.resultados == null ? '' : x.resultados + ' resultados')]); });
+    (d.buscas_sem_resultado || []).forEach(function(x) { linhas.push(['Busca sem resultado', x.termo, '', x.vezes, '', '']); });
+    (d.produtos_top || []).forEach(function(x) { linhas.push(['Produto aberto', x.nome, x.grupo, x.vistas, x.pessoas, 'vendidos: ' + x.vendidos]); });
+    (d.bairros_pedidos || []).forEach(function(x) { linhas.push(['Bairro (pedidos)', x.bairro, x.cidade, x.pedidos, '', 'pagos: ' + x.pagos]); });
+    (d.zonas || []).forEach(function(x) { linhas.push(['Zona (visitas)', x.zona, '', x.visitas, '', '']); });
+    baixarCSV(linhas, 'o-que-procuram-' + new Date().toISOString().slice(0, 10) + '.csv');
   }
 
   // ============================================
