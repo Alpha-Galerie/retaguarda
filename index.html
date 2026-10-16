@@ -2223,7 +2223,7 @@
                 onmouseleave="this.style.borderColor='var(--line)';this.style.color='var(--text-dim)'">
                 📋 Copiar
               </button>
-              <button id="mImprimirEtiqueta" onclick="imprimirEtiqueta()" title="Imprimir etiqueta de entrega (número, nome e endereço)"
+              <button id="mImprimirEtiqueta" onclick="imprimirEtiqueta()" title="Imprimir etiqueta autocolante 80 × 60 mm (pedido, QR, nome e endereço)"
                 style="background:none;border:1px solid var(--gold);color:var(--gold);padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
                 onmouseenter="this.style.background='var(--gold)';this.style.color='#000'"
                 onmouseleave="this.style.background='none';this.style.color='var(--gold)'">
@@ -2924,6 +2924,7 @@
     armarDesbloqueioPorGesto();
     loadAll().then(function() {
       iniciarVigiaDePedidos();
+      abrirPedidoDoLink();
     });
   }
 
@@ -5410,7 +5411,7 @@
   }
 
   // ============================================
-  // ETIQUETA DE ENTREGA (térmica 80 mm — Elgin i9)
+  // ETIQUETA DE ENTREGA (autocolante 80 × 60 mm — Elgin i9)
   // ============================================
   // Os pedidos do site gravavam bairro, cidade, CEP e complemento duas vezes
   // no endereço. Aqui sai cada trecho uma vez só. Número solto fica mesmo
@@ -5441,28 +5442,95 @@
     return p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '';
   }
 
-  // Número do pedido, primeiro nome e endereço — sem telefone. Imprime por
-  // um iframe escondido: a página da retaguarda não muda e a bobina de 80 mm
-  // (72 mm úteis) recebe só a etiqueta.
-  function imprimirEtiqueta() {
+  // Etiqueta autocolante 80 × 60 mm na Elgin i9, no estilo das etiquetas de
+  // transportadora: marca e QR no topo, faixa preta com o tipo de entrega,
+  // destinatário e endereço em destaque e o remetente no rodapé. Sem o
+  // telefone do cliente. O QR abre este pedido na retaguarda (#pedido=N).
+  // Imprime por um iframe escondido: a página da retaguarda não muda.
+  var ETIQUETA_LARGURA_MM = 80;
+  var ETIQUETA_ALTURA_MM = 60;
+  var telefoneLojaEtiqueta = null;
+
+  async function telefoneDaLoja() {
+    if (telefoneLojaEtiqueta !== null) return telefoneLojaEtiqueta;
+    var campo = valorLoja('lojaTelefone');
+    if (campo) return (telefoneLojaEtiqueta = campo);
+    try {
+      var res = await sb.from('configuracoes').select('valor').eq('chave', 'loja_telefone').maybeSingle();
+      telefoneLojaEtiqueta = (res.data && res.data.valor) ? String(res.data.valor).trim() : '';
+    } catch (e) {
+      telefoneLojaEtiqueta = '';
+    }
+    return telefoneLojaEtiqueta;
+  }
+
+  function linkDoPedido(o) {
+    return location.origin + location.pathname + '#pedido=' + encodeURIComponent(o.numero);
+  }
+
+  function qrDoPedido(o) {
+    if (!window.QRCode || !QRCode.toDataURL) return Promise.resolve('');
+    return QRCode.toDataURL(linkDoPedido(o), { margin: 0, width: 240, errorCorrectionLevel: 'M' })
+      .catch(function() { return ''; });
+  }
+
+  async function imprimirEtiqueta() {
     var id = parseInt(document.getElementById('orderModal').dataset.orderId);
     var o = allOrders.find(function(x) { return x.id === id; });
     if (!o) return;
     var linhas = linhasEndereco(o.cliente_endereco);
     if (!linhas.length) { toast('Pedido sem endereço para imprimir', 'red'); return; }
 
+    var resultados = await Promise.all([qrDoPedido(o), telefoneDaLoja()]);
+    var qr = resultados[0];
+    var tel = resultados[1];
+    var tipo = o.tipo_entrega === 'retirada' ? 'RETIRADA NA LOJA' : 'ENTREGA';
+    var data = o.criado_em ? new Date(o.criado_em).toLocaleDateString('pt-BR') : '';
+
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido #' + esc(o.numero) + '</title><style>' +
-      '@page { margin: 0; }' +
+      '@page { size: ' + ETIQUETA_LARGURA_MM + 'mm ' + ETIQUETA_ALTURA_MM + 'mm; margin: 0; }' +
+      '* { box-sizing: border-box; }' +
       'html, body { margin: 0; padding: 0; background: #fff; }' +
-      'body { width: 72mm; padding: 3mm 2mm 6mm; box-sizing: border-box; color: #000;' +
-      ' font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; }' +
-      '.num { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; word-break: break-all; }' +
-      '.nome { font-size: 26px; font-weight: 800; margin: 2mm 0 2.5mm; line-height: 1.1; word-break: break-word; }' +
-      '.end div { font-size: 16px; font-weight: 700; line-height: 1.3; word-break: break-word; }' +
-      '</style></head><body>' +
-      '<div class="num">PEDIDO #' + esc(o.numero) + '</div>' +
+      'body { width: ' + ETIQUETA_LARGURA_MM + 'mm; height: ' + ETIQUETA_ALTURA_MM + 'mm; overflow: hidden; color: #000;' +
+      ' font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+      '.et { width: 100%; height: 100%; padding: 2.5mm 4mm 2mm; display: flex; flex-direction: column; }' +
+      '.topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 3mm; }' +
+      '.marca { display: flex; align-items: center; gap: 2mm; }' +
+      '.selo { width: 9mm; height: 9mm; border: 0.5mm solid #000; border-radius: 50%; display: flex; align-items: center;' +
+      ' justify-content: center; font-family: Georgia, serif; font-style: italic; font-size: 15px; line-height: 1; }' +
+      '.loja { font-family: Georgia, serif; font-size: 15px; font-weight: 700; letter-spacing: 0.02em; line-height: 1; }' +
+      '.cidade { font-size: 7px; letter-spacing: 0.18em; margin-top: 1mm; }' +
+      '.num { font-size: 15px; font-weight: 800; margin-top: 2mm; letter-spacing: 0.02em; white-space: nowrap; }' +
+      '.data { font-size: 7.5px; margin-top: 0.5mm; }' +
+      '.qr { text-align: center; flex-shrink: 0; }' +
+      '.qr img { width: 15mm; height: 15mm; display: block; image-rendering: pixelated; }' +
+      '.qr span { display: block; font-size: 5.5px; letter-spacing: 0.1em; margin-top: 0.6mm; }' +
+      '.faixa { background: #000; color: #fff; font-size: 9px; font-weight: 700; letter-spacing: 0.14em;' +
+      ' padding: 0.8mm 2mm; margin: 2mm 0 1.6mm; }' +
+      '.rot { font-size: 7.5px; font-weight: 700; letter-spacing: 0.14em; }' +
+      '.nome { font-size: 19px; font-weight: 800; line-height: 1.05; margin: 0.4mm 0 1.2mm; word-break: break-word; }' +
+      '.end { flex: 1; overflow: hidden; }' +
+      '.end div { font-size: 11.5px; font-weight: 700; line-height: 1.22; word-break: break-word; }' +
+      '.rodape { border-top: 0.3mm solid #000; padding-top: 1mm; font-size: 7px; display: flex; justify-content: space-between; gap: 2mm; }' +
+      '</style></head><body><div class="et">' +
+      '<div class="topo">' +
+        '<div>' +
+          '<div class="marca"><div class="selo">ag</div><div><div class="loja">alpha.galerie</div><div class="cidade">ALPHAVILLE</div></div></div>' +
+          '<div class="num">PEDIDO #' + esc(o.numero) + '</div>' +
+          (data ? '<div class="data">' + esc(data) + '</div>' : '') +
+        '</div>' +
+        (qr ? '<div class="qr"><img src="' + qr + '" alt=""><span>PEDIDO</span></div>' : '') +
+      '</div>' +
+      '<div class="faixa">' + tipo + '</div>' +
+      '<div class="rot">DESTINATÁRIO</div>' +
       '<div class="nome">' + esc(primeiroNome(o.cliente_nome)) + '</div>' +
-      '<div class="end">' + linhas.map(function(l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>' +
+      '<div class="end"><div>' + esc(linhas[0]) + '</div>' + (linhas.length > 1 ? '<div>' + esc(linhas.slice(1).join(', ')) + '</div>' : '') + '</div>' +
+      '<div class="rodape"><span>Remetente: <b>alpha.galerie</b></span>' + (tel ? '<span>WhatsApp ' + esc(tel) + '</span>' : '') + '</div>' +
+      '</div>' +
+      // Endereço longo: diminui a letra até caber acima do rodapé.
+      '<script>(function(){var e=document.querySelector(".end"),t=11.5;' +
+      'while(e.scrollHeight>e.clientHeight&&t>7.5){t-=0.5;e.style.fontSize=t+"px";' +
+      'for(var i=0;i<e.children.length;i++)e.children[i].style.fontSize=t+"px";}})();<\/script>' +
       '</body></html>';
 
     var frame = document.getElementById('etiquetaFrame');
@@ -5481,7 +5549,19 @@
     setTimeout(function() {
       frame.contentWindow.focus();
       frame.contentWindow.print();
-    }, 50);
+    }, 150);
+  }
+
+  // O QR da etiqueta traz #pedido=<número>: lido pelo celular já logado,
+  // abre o pedido direto.
+  function abrirPedidoDoLink() {
+    var m = /[#&]pedido=([^&]+)/.exec(location.hash || '');
+    if (!m) return;
+    var numero = decodeURIComponent(m[1]);
+    var o = allOrders.find(function(x) { return String(x.numero) === numero; });
+    if (o) openOrderDetail(o.id);
+    else toast('Pedido #' + numero + ' não encontrado', 'red');
+    history.replaceState(null, '', location.pathname + location.search);
   }
 
   function copiarCampo(fieldId) {
