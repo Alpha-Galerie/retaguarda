@@ -5447,8 +5447,13 @@
   // destinatário e endereço em destaque. Sem rodapé (ocupava uma segunda
   // etiqueta) e sem o telefone do cliente. O QR abre este pedido na retaguarda (#pedido=N).
   // Imprime por um iframe escondido: a página da retaguarda não muda.
-  var ETIQUETA_LARGURA_MM = 80;
-  var ETIQUETA_ALTURA_MM = 60;
+  // Sem tamanho no @page: vale o papel configurado no driver da Elgin, como
+  // na bobina. Com @page 80 × 60 (mais largo que alto) o Chrome virava a
+  // página em paisagem e cortava a etiqueta em duas. A i9 imprime 72 mm
+  // úteis; a altura fica um pouco abaixo dos 60 mm da etiqueta.
+  var ETIQUETA_LARGURA_MM = 72;
+  var ETIQUETA_ALTURA_MM = 56;
+
   function linkDoPedido(o) {
     return location.origin + location.pathname + '#pedido=' + encodeURIComponent(o.numero);
   }
@@ -5471,19 +5476,20 @@
     var data = o.criado_em ? new Date(o.criado_em).toLocaleDateString('pt-BR') : '';
 
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido #' + esc(o.numero) + '</title><style>' +
-      '@page { size: ' + ETIQUETA_LARGURA_MM + 'mm ' + ETIQUETA_ALTURA_MM + 'mm; margin: 0; }' +
+      '@page { margin: 0; }' +
       '* { box-sizing: border-box; }' +
       'html, body { margin: 0; padding: 0; background: #fff; }' +
-      'body { width: ' + ETIQUETA_LARGURA_MM + 'mm; height: ' + (ETIQUETA_ALTURA_MM - 1) + 'mm; overflow: hidden; color: #000;' +
+      'body { width: ' + ETIQUETA_LARGURA_MM + 'mm; height: ' + ETIQUETA_ALTURA_MM + 'mm; overflow: hidden; color: #000;' +
       ' font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
-      '.et { width: 100%; height: 100%; padding: 2.5mm 4mm 2mm; display: flex; flex-direction: column; }' +
-      '.topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 3mm; }' +
+      '.et { width: 100%; height: 100%; padding: 2mm 1.5mm 1mm; display: flex; flex-direction: column; }' +
+      '.topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }' +
+      '.topo > div:first-child { flex: 1; min-width: 0; }' +
       '.marca { display: flex; align-items: center; gap: 2mm; }' +
       '.selo { width: 9mm; height: 9mm; border: 0.5mm solid #000; border-radius: 50%; display: flex; align-items: center;' +
       ' justify-content: center; font-family: Georgia, serif; font-style: italic; font-size: 15px; line-height: 1; }' +
       '.loja { font-family: Georgia, serif; font-size: 15px; font-weight: 700; letter-spacing: 0.02em; line-height: 1; }' +
       '.cidade { font-size: 7px; letter-spacing: 0.18em; margin-top: 1mm; }' +
-      '.num { font-size: 15px; font-weight: 800; margin-top: 2mm; letter-spacing: 0.02em; white-space: nowrap; }' +
+      '.num { font-size: 14px; font-weight: 800; margin-top: 2mm; letter-spacing: 0.01em; word-break: break-all; line-height: 1.1; }' +
       '.data { font-size: 7.5px; margin-top: 0.5mm; }' +
       '.qr { text-align: center; flex-shrink: 0; }' +
       '.qr img { width: 15mm; height: 15mm; display: block; image-rendering: pixelated; }' +
