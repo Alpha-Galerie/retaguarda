@@ -5444,26 +5444,11 @@
 
   // Etiqueta autocolante 80 × 60 mm na Elgin i9, no estilo das etiquetas de
   // transportadora: marca e QR no topo, faixa preta com o tipo de entrega,
-  // destinatário e endereço em destaque e o remetente no rodapé. Sem o
-  // telefone do cliente. O QR abre este pedido na retaguarda (#pedido=N).
+  // destinatário e endereço em destaque. Sem rodapé (ocupava uma segunda
+  // etiqueta) e sem o telefone do cliente. O QR abre este pedido na retaguarda (#pedido=N).
   // Imprime por um iframe escondido: a página da retaguarda não muda.
   var ETIQUETA_LARGURA_MM = 80;
   var ETIQUETA_ALTURA_MM = 60;
-  var telefoneLojaEtiqueta = null;
-
-  async function telefoneDaLoja() {
-    if (telefoneLojaEtiqueta !== null) return telefoneLojaEtiqueta;
-    var campo = valorLoja('lojaTelefone');
-    if (campo) return (telefoneLojaEtiqueta = campo);
-    try {
-      var res = await sb.from('configuracoes').select('valor').eq('chave', 'loja_telefone').maybeSingle();
-      telefoneLojaEtiqueta = (res.data && res.data.valor) ? String(res.data.valor).trim() : '';
-    } catch (e) {
-      telefoneLojaEtiqueta = '';
-    }
-    return telefoneLojaEtiqueta;
-  }
-
   function linkDoPedido(o) {
     return location.origin + location.pathname + '#pedido=' + encodeURIComponent(o.numero);
   }
@@ -5481,9 +5466,7 @@
     var linhas = linhasEndereco(o.cliente_endereco);
     if (!linhas.length) { toast('Pedido sem endereço para imprimir', 'red'); return; }
 
-    var resultados = await Promise.all([qrDoPedido(o), telefoneDaLoja()]);
-    var qr = resultados[0];
-    var tel = resultados[1];
+    var qr = await qrDoPedido(o);
     var tipo = o.tipo_entrega === 'retirada' ? 'RETIRADA NA LOJA' : 'ENTREGA';
     var data = o.criado_em ? new Date(o.criado_em).toLocaleDateString('pt-BR') : '';
 
@@ -5491,7 +5474,7 @@
       '@page { size: ' + ETIQUETA_LARGURA_MM + 'mm ' + ETIQUETA_ALTURA_MM + 'mm; margin: 0; }' +
       '* { box-sizing: border-box; }' +
       'html, body { margin: 0; padding: 0; background: #fff; }' +
-      'body { width: ' + ETIQUETA_LARGURA_MM + 'mm; height: ' + ETIQUETA_ALTURA_MM + 'mm; overflow: hidden; color: #000;' +
+      'body { width: ' + ETIQUETA_LARGURA_MM + 'mm; height: ' + (ETIQUETA_ALTURA_MM - 1) + 'mm; overflow: hidden; color: #000;' +
       ' font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
       '.et { width: 100%; height: 100%; padding: 2.5mm 4mm 2mm; display: flex; flex-direction: column; }' +
       '.topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 3mm; }' +
@@ -5511,7 +5494,6 @@
       '.nome { font-size: 19px; font-weight: 800; line-height: 1.05; margin: 0.4mm 0 1.2mm; word-break: break-word; }' +
       '.end { flex: 1; overflow: hidden; }' +
       '.end div { font-size: 11.5px; font-weight: 700; line-height: 1.22; word-break: break-word; }' +
-      '.rodape { border-top: 0.3mm solid #000; padding-top: 1mm; font-size: 7px; display: flex; justify-content: space-between; gap: 2mm; }' +
       '</style></head><body><div class="et">' +
       '<div class="topo">' +
         '<div>' +
@@ -5525,7 +5507,6 @@
       '<div class="rot">DESTINATÁRIO</div>' +
       '<div class="nome">' + esc(primeiroNome(o.cliente_nome)) + '</div>' +
       '<div class="end"><div>' + esc(linhas[0]) + '</div>' + (linhas.length > 1 ? '<div>' + esc(linhas.slice(1).join(', ')) + '</div>' : '') + '</div>' +
-      '<div class="rodape"><span>Remetente: <b>alpha.galerie</b></span>' + (tel ? '<span>WhatsApp ' + esc(tel) + '</span>' : '') + '</div>' +
       '</div>' +
       // Endereço longo: diminui a letra até caber acima do rodapé.
       '<script>(function(){var e=document.querySelector(".end"),t=11.5;' +
