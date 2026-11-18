@@ -4568,7 +4568,7 @@
       return '<tr onclick="openOrderDetail(' + o.id + ')" style="cursor:pointer;">' +
         '<td><div class="order-num">#' + o.numero + '</div><div class="order-date">' + fmtDate(o.criado_em) + '</div><div style="margin-top:4px;">' + canalBadge + '</div></td>' +
         '<td><div class="order-cli">' + o.cliente_nome + '<small>' + (o.cliente_whatsapp || '') + '</small></div></td>' +
-        '<td><div>' + itens + ' itens</div><small class="mono" style="color:var(--text-faint)">' + (o.tipo_entrega === 'retirada' ? '🏪' : '🛵') + ' ' + pag + '</small></td>' +
+        '<td><div>' + itens + ' itens</div><small class="mono" style="color:var(--text-faint)">' + (o.tipo_entrega === 'retirada' ? '🏪' : o.tipo_entrega === 'nacional' ? '📦' : '🛵') + ' ' + pag + '</small></td>' +
         '<td><div class="order-total">' + fmt(o.total) + '</div></td>' +
         '<td>' + statusBadge(o.status) + '</td>' +
         '<td><span style="color:var(--text-faint);font-size:11px;">VER →</span></td>' +
@@ -5472,7 +5472,7 @@
     if (!linhas.length) { toast('Pedido sem endereço para imprimir', 'red'); return; }
 
     var qr = await qrDoPedido(o);
-    var tipo = o.tipo_entrega === 'retirada' ? 'RETIRADA NA LOJA' : 'ENTREGA';
+    var tipo = o.tipo_entrega === 'retirada' ? 'RETIRADA NA LOJA' : o.tipo_entrega === 'nacional' ? 'ENVIO NACIONAL (POSTAR)' : 'ENTREGA';
     var data = o.criado_em ? new Date(o.criado_em).toLocaleDateString('pt-BR') : '';
 
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido #' + esc(o.numero) + '</title><style>' +
