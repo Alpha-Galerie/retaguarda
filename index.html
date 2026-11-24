@@ -409,6 +409,9 @@
       overflow-y: auto;
     }
     .modal.open { display: flex; }
+    .est-aba { padding: 10px 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .est-aba.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .est-sel { background: var(--bg-soft); border: 1px solid var(--line); color: var(--text); padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; min-width: 150px; }
     .modal-box {
       max-width: 720px; width: 100%;
       background: var(--bg-soft);
@@ -1118,6 +1121,7 @@
         <nav class="topbar-tabs">
           <button class="tab-btn active" data-tab="pedidos" onclick="switchTab('pedidos')">Pedidos<span id="alertaBadge" style="display:none;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:7px;padding:0 5px;background:var(--red);color:#fff;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;vertical-align:middle;"></span></button>
           <button class="tab-btn" data-tab="produtos" onclick="switchTab('produtos')">Produtos</button>
+          <button class="tab-btn" data-tab="estoque" onclick="switchTab('estoque')">📦 Estoque</button>
           <button class="tab-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
           <button class="tab-btn" data-tab="clube" onclick="switchTab('clube')" style="color:#c9a961;">⭐ Alpha Club</button>
           <button class="tab-btn" data-tab="performance" onclick="switchTab('performance')" style="color:#c9a961;">📊 Performance</button>
@@ -1634,6 +1638,90 @@
               <tr><td colspan="6" class="empty-table"><h4>Carregando...</h4></td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ESTOQUE TAB -->
+      <!-- Estoque único para site e PDV: toda venda (site ou loja) baixa
+           daqui, e toda mudança fica no histórico (estoque_movimentos). -->
+      <div id="tab-estoque" class="tab-content" style="display:none;">
+        <div class="page-header">
+          <h2 class="page-title">Controle de <em>estoque</em></h2>
+          <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-gold btn-sm btn-auto" onclick="abrirLancamentoEstoque('entrada')">+ Entrada de mercadoria</button>
+            <button class="btn btn-ghost btn-sm btn-auto" onclick="abrirLancamentoEstoque('contagem')">☑ Contagem / balanço</button>
+            <button class="btn btn-ghost btn-sm btn-auto" onclick="exportarListaCompras()">⬇ Lista de compras (CSV)</button>
+          </div>
+        </div>
+
+        <div class="stats" id="estStats">
+          <div class="stat-card"><div class="stat-label">Unidades em estoque</div><div class="stat-value" id="estUnid">—</div><div class="stat-trend" id="estUnidSub">—</div></div>
+          <div class="stat-card"><div class="stat-label">Valor em estoque</div><div class="stat-value gold" id="estValor">—</div><div class="stat-trend">a preço de venda (Pix)</div></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="setEstFiltro('comprar')"><div class="stat-label">Comprar agora</div><div class="stat-value" id="estComprar" style="color:var(--orange);">—</div><div class="stat-trend">acaba em menos de <span id="estAlertaDias">7</span> dias</div></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="setEstFiltro('negativo')"><div class="stat-label">Estoque negativo</div><div class="stat-value" id="estNeg" style="color:var(--red);">—</div><div class="stat-trend">vendeu mais do que o sistema tinha — recontar</div></div>
+        </div>
+
+        <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--line);">
+          <button class="est-aba active" id="estAbaGiro" onclick="setEstAba('giro')">Giro e compras</button>
+          <button class="est-aba" id="estAbaHist" onclick="setEstAba('hist')">Histórico de movimentação</button>
+        </div>
+
+        <div id="estPainelGiro">
+          <div class="filters-bar" style="flex-wrap:wrap;gap:10px;">
+            <input type="text" class="search-input" placeholder="Buscar por nome ou código..." id="estBusca" oninput="renderEstoque()" style="flex:1;min-width:200px;" />
+            <select id="estCat" onchange="renderEstoque()" class="est-sel"><option value="">TODAS CATEGORIAS</option></select>
+            <select id="estFiltro" onchange="renderEstoque()" class="est-sel">
+              <option value="comprar">Comprar agora</option>
+              <option value="">Todos os produtos</option>
+              <option value="zerado">Zerados</option>
+              <option value="negativo">Negativos</option>
+              <option value="parado">Parados (sem venda no período)</option>
+            </select>
+            <label class="mono" style="display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:10px;">VENDAS DE
+              <select id="estDias" onchange="carregarEstoque()" class="est-sel" style="min-width:0;"><option value="30">30 dias</option><option value="60">60 dias</option><option value="90" selected>90 dias</option></select>
+            </label>
+            <label class="mono" style="display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:10px;">COMPRAR P/
+              <input type="number" id="estCobertura" value="30" min="7" step="1" onchange="renderEstoque()" style="width:64px;background:var(--bg-soft);border:1px solid var(--line);color:var(--text);padding:9px;font-family:'JetBrains Mono',monospace;" /> DIAS
+            </label>
+            <span id="estCount" class="mono" style="color:var(--text-faint);font-size:11px;white-space:nowrap;"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Produto</th><th>Categoria</th>
+                <th style="text-align:right;">Estoque</th>
+                <th style="text-align:right;" title="Vendas pagas no período: site + loja (PDV)">Vendidos<br><span style="font-weight:400;opacity:.6;">site · loja</span></th>
+                <th style="text-align:right;">Média<br><span style="font-weight:400;opacity:.6;">por semana</span></th>
+                <th style="text-align:right;">Dura</th>
+                <th style="text-align:right;">Comprar</th>
+                <th>Última venda</th><th></th>
+              </tr></thead>
+              <tbody id="estBody"><tr><td colspan="9" class="empty-table"><h4>Carregando...</h4></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="estPainelHist" style="display:none;">
+          <div class="filters-bar" style="flex-wrap:wrap;gap:10px;">
+            <input type="text" class="search-input" placeholder="Filtrar por produto..." id="histBusca" oninput="renderHistorico()" style="flex:1;min-width:200px;" />
+            <select id="histMotivo" onchange="renderHistorico()" class="est-sel">
+              <option value="">TODOS OS MOTIVOS</option>
+              <option value="venda">Vendas</option><option value="estorno">Estornos (cancelados)</option>
+              <option value="entrada">Entradas de mercadoria</option><option value="contagem">Contagens</option>
+              <option value="ajuste">Ajustes manuais</option><option value="cadastro">Cadastro</option>
+            </select>
+            <select id="histOrigem" onchange="renderHistorico()" class="est-sel">
+              <option value="">SITE + LOJA</option><option value="site">Só site</option><option value="pdv">Só loja (PDV)</option><option value="retaguarda">Só retaguarda</option>
+            </select>
+            <button class="btn btn-ghost btn-sm btn-auto" onclick="carregarHistorico()">↻ Atualizar</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Quando</th><th>Produto</th><th>Motivo</th><th style="text-align:right;">Qtd</th><th style="text-align:right;">Saldo</th><th>Quem / pedido</th></tr></thead>
+              <tbody id="histBody"><tr><td colspan="6" class="empty-table"><h4>Carregando...</h4></td></tr></tbody>
+            </table>
+          </div>
+          <div style="font-size:11px;color:var(--text-faint);margin-top:10px;">Mostra as 500 movimentações mais recentes. O histórico começou a ser gravado em 24/11/2026.</div>
         </div>
       </div>
 
@@ -2589,6 +2677,39 @@
   </div>
 
   <!-- PRODUTO FORM MODAL -->
+  <!-- LANÇAMENTO DE ESTOQUE (entrada / contagem) -->
+  <div class="modal" id="estLancModal">
+    <div class="modal-box" style="max-width:820px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="estLancTitulo">Entrada de <em>mercadoria</em></h3>
+          <div style="font-size:12px;color:var(--text-dim);" id="estLancSub"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal('estLancModal')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="position:relative;margin-bottom:14px;">
+        <input type="text" id="estLancBusca" class="search-input" placeholder="Digite o nome ou código do produto e escolha na lista (Enter adiciona o primeiro)..." oninput="estLancSugerir()" onkeydown="if(event.key==='Enter'){event.preventDefault();estLancEscolher(0);}" style="width:100%;" autocomplete="off" />
+        <div id="estLancSug" style="position:absolute;left:0;right:0;top:100%;z-index:5;background:var(--bg);border:1px solid var(--line);max-height:260px;overflow-y:auto;display:none;"></div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:14px;">
+        <table>
+          <thead><tr><th>Produto</th><th style="text-align:right;">No sistema</th><th style="text-align:right;" id="estLancColQtd">Chegou</th><th style="text-align:right;">Fica</th><th></th></tr></thead>
+          <tbody id="estLancBody"></tbody>
+        </table>
+      </div>
+      <div class="form-group">
+        <label id="estLancObsLbl">Fornecedor / nota (opcional)</label>
+        <input type="text" id="estLancObs" />
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-ghost btn-sm btn-auto" onclick="closeModal('estLancModal')">Cancelar</button>
+        <button class="btn btn-gold btn-sm btn-auto" id="estLancSalvar" onclick="salvarLancamentoEstoque()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="prodModal">
     <div class="modal-box">
       <div class="modal-header">
@@ -3823,6 +3944,9 @@
       carregarVisitas().then(function() {
         try { renderPerformance(); } catch (e) { console.warn(e); }
       });
+    }
+    if (tab === 'estoque') {
+      carregarEstoque();
     }
     if (tab === 'clientes') {
       montarIndiceClientes();
@@ -8274,6 +8398,348 @@
     closeModal('pedidoManualModal');
     pedidoManual = null;
     openOrderDetail(o.id);
+  }
+
+  // ============================================
+  // ESTOQUE
+  // --------------------------------------------
+  // Um estoque só para o site e para a loja: o PDV grava cada venda com o
+  // produto (e a variação) e o banco baixa daqui na hora de marcar como
+  // pago — o mesmo caminho do site. Toda mudança de quantidade (venda,
+  // cancelamento, entrada, contagem, edição na aba Produtos) cai em
+  // `estoque_movimentos`, então dá para explicar qualquer número.
+  //
+  // A sugestão de compra é simples de propósito: média de venda diária do
+  // período × dias que se quer cobrir − o que já tem.
+  // ============================================
+  var estRows = [];
+  var estCarregado = false;
+  var EST_ALERTA_DIAS = 7;
+  var histRows = [];
+  var histCarregado = false;
+
+  async function carregarEstoque() {
+    var body = document.getElementById('estBody');
+    if (body && !estRows.length) body.innerHTML = '<tr><td colspan="9" class="empty-table"><h4>Carregando...</h4></td></tr>';
+    var dias = parseInt(document.getElementById('estDias').value) || 90;
+    var res = await sb.rpc('estoque_relatorio', { p_dias: dias }).range(0, 9999);
+    if (res.error) {
+      console.error(res.error);
+      if (body) body.innerHTML = '<tr><td colspan="9" class="empty-table"><h4>Erro ao carregar o estoque</h4><p>' + esc(res.error.message) + '</p></td></tr>';
+      return;
+    }
+    estRows = (res.data || []).filter(function(r) { return r.ativo || num(r.estoque) !== 0; });
+    estCarregado = true;
+    var sel = document.getElementById('estCat');
+    var atual = sel.value;
+    var cats = {};
+    estRows.forEach(function(r) { if (r.categoria) cats[r.categoria] = 1; });
+    sel.innerHTML = '<option value="">TODAS CATEGORIAS</option>' + Object.keys(cats).sort().map(function(c) {
+      return '<option value="' + esc(c) + '"' + (c === atual ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('');
+    renderEstoque();
+  }
+
+  function estCalc(r) {
+    var dias = parseInt(document.getElementById('estDias').value) || 90;
+    var cobertura = Math.max(1, parseInt(document.getElementById('estCobertura').value) || 30);
+    var est = num(r.estoque);
+    var vend = num(r.vendidos_site) + num(r.vendidos_pdv);
+    var diaria = vend / dias;
+    var dura = est <= 0 ? 0 : (diaria > 0 ? est / diaria : Infinity);
+    var comprar = diaria > 0 ? Math.max(0, Math.ceil(diaria * cobertura) - est) : (est < 0 ? -est : 0);
+    return { est: est, vend: vend, semana: diaria * 7, dura: dura, comprar: comprar, urgente: vend > 0 && dura < EST_ALERTA_DIAS };
+  }
+
+  function setEstFiltro(f) {
+    setEstAba('giro');
+    document.getElementById('estFiltro').value = f;
+    renderEstoque();
+  }
+
+  function setEstAba(aba) {
+    document.getElementById('estAbaGiro').classList.toggle('active', aba === 'giro');
+    document.getElementById('estAbaHist').classList.toggle('active', aba === 'hist');
+    document.getElementById('estPainelGiro').style.display = aba === 'giro' ? 'block' : 'none';
+    document.getElementById('estPainelHist').style.display = aba === 'hist' ? 'block' : 'none';
+    if (aba === 'hist' && !histCarregado) carregarHistorico();
+  }
+
+  function nomeEstRow(r) { return r.nome + (r.variacao ? ' · ' + r.variacao : ''); }
+
+  function renderEstoque() {
+    var body = document.getElementById('estBody');
+    if (!body || !estCarregado) return;
+    document.getElementById('estAlertaDias').textContent = EST_ALERTA_DIAS;
+
+    // Resumo (sempre do estoque todo, sem filtro)
+    var unid = 0, valor = 0, comprar = 0, neg = 0, zerados = 0;
+    estRows.forEach(function(r) {
+      var c = estCalc(r);
+      if (c.est > 0) { unid += c.est; valor += c.est * num(r.preco); }
+      if (c.est < 0) neg++;
+      if (c.est === 0 && r.ativo) zerados++;
+      if (c.urgente) comprar++;
+    });
+    setText('estUnid', unid.toLocaleString('pt-BR'));
+    setText('estUnidSub', zerados + ' produtos zerados');
+    setText('estValor', fmt(valor));
+    setText('estComprar', String(comprar));
+    setText('estNeg', String(neg));
+
+    var termo = (document.getElementById('estBusca').value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    var cat = document.getElementById('estCat').value;
+    var filtro = document.getElementById('estFiltro').value;
+    var lista = estRows.map(function(r) { return { r: r, c: estCalc(r) }; }).filter(function(x) {
+      var r = x.r, c = x.c;
+      if (cat && r.categoria !== cat) return false;
+      if (termo) {
+        var alvo = ((r.codigo || '') + ' ' + nomeEstRow(r) + ' ' + (r.subcategoria || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (termo.split(/\s+/).some(function(t) { return t && alvo.indexOf(t) < 0; })) return false;
+      }
+      if (filtro === 'comprar') return c.urgente;
+      if (filtro === 'zerado') return c.est === 0;
+      if (filtro === 'negativo') return c.est < 0;
+      if (filtro === 'parado') return c.vend === 0 && c.est > 0;
+      return true;
+    });
+    lista.sort(function(a, b) {
+      if (filtro === 'comprar') return a.c.dura - b.c.dura || b.c.vend - a.c.vend;
+      if (filtro === 'parado') return b.c.est * num(b.r.preco) - a.c.est * num(a.r.preco);
+      return b.c.vend - a.c.vend || String(a.r.nome).localeCompare(String(b.r.nome));
+    });
+    setText('estCount', lista.length + ' itens');
+
+    if (!lista.length) {
+      body.innerHTML = '<tr><td colspan="9" class="empty-table"><h4>' +
+        (filtro === 'comprar' ? 'Nada acabando nos próximos ' + EST_ALERTA_DIAS + ' dias ✓' : 'Nenhum produto neste filtro') + '</h4></td></tr>';
+      return;
+    }
+    body.innerHTML = lista.slice(0, 400).map(function(x) {
+      var r = x.r, c = x.c;
+      var corEst = c.est < 0 ? 'var(--red)' : c.est === 0 ? 'var(--orange)' : 'var(--text)';
+      var dura = c.est <= 0 ? (c.vend > 0 ? '<span style="color:var(--red);">acabou</span>' : '—')
+        : c.dura === Infinity ? '<span style="color:var(--text-faint);">sem giro</span>'
+        : (c.dura < EST_ALERTA_DIAS ? '<span style="color:var(--orange);">' : '<span>') + Math.round(c.dura) + ' dias</span>';
+      return '<tr>' +
+        '<td><div style="font-weight:600;">' + esc(nomeEstRow(r)) + '</div><small class="mono" style="color:var(--text-faint);letter-spacing:0.05em;">' + esc(r.codigo || '—') + (r.ativo ? '' : ' · inativo') + '</small></td>' +
+        '<td style="font-size:12px;color:var(--text-dim);">' + esc(r.categoria || '—') + (r.subcategoria ? '<br><small>' + esc(r.subcategoria) + '</small>' : '') + '</td>' +
+        '<td style="text-align:right;font-weight:700;color:' + corEst + ';font-family:\'JetBrains Mono\',monospace;">' + c.est + '</td>' +
+        '<td style="text-align:right;font-family:\'JetBrains Mono\',monospace;">' + c.vend + '<br><small style="color:var(--text-faint);">' + num(r.vendidos_site) + ' · ' + num(r.vendidos_pdv) + '</small></td>' +
+        '<td style="text-align:right;font-family:\'JetBrains Mono\',monospace;">' + (c.semana ? c.semana.toFixed(1).replace('.', ',') : '—') + '</td>' +
+        '<td style="text-align:right;font-size:12px;">' + dura + '</td>' +
+        '<td style="text-align:right;font-weight:700;color:var(--gold);font-family:\'JetBrains Mono\',monospace;">' + (c.comprar || '—') + '</td>' +
+        '<td style="font-size:12px;color:var(--text-dim);">' + (r.ultima_venda ? new Date(r.ultima_venda).toLocaleDateString('pt-BR') : '—') + '</td>' +
+        '<td><button onclick="verHistoricoProduto(' + r.produto_id + ',' + JSON.stringify(nomeEstRow(r)).replace(/"/g, '&quot;') + ')" style="color:var(--gold);font-size:11px;white-space:nowrap;">histórico →</button></td>' +
+        '</tr>';
+    }).join('') + (lista.length > 400 ? '<tr><td colspan="9" style="text-align:center;color:var(--text-faint);font-size:12px;padding:14px;">Mostrando 400 de ' + lista.length + ' — use a busca ou os filtros.</td></tr>' : '');
+  }
+
+  function exportarListaCompras() {
+    if (!estCarregado) { toast('Abra a aba e espere carregar'); return; }
+    var linhas = estRows.map(function(r) { return { r: r, c: estCalc(r) }; })
+      .filter(function(x) { return x.c.comprar > 0; })
+      .sort(function(a, b) { return a.c.dura - b.c.dura; });
+    if (!linhas.length) { toast('Nada para comprar com os filtros atuais', 'green'); return; }
+    var dias = document.getElementById('estDias').value, cob = document.getElementById('estCobertura').value;
+    var csv = [['Codigo', 'Produto', 'Variacao', 'Categoria', 'Estoque', 'Vendidos ' + dias + 'd', 'Dura (dias)', 'Comprar p/ ' + cob + 'd'].join(';')]
+      .concat(linhas.map(function(x) {
+        return [x.r.codigo || '', x.r.nome, x.r.variacao || '', x.r.categoria || '', x.c.est, x.c.vend,
+          x.c.dura === Infinity ? '' : Math.round(x.c.dura), x.c.comprar]
+          .map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';');
+      })).join('\r\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'lista-de-compras-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 2000);
+  }
+
+  // ---------- Histórico ----------
+  var MOTIVOS_EST = { venda: '🛒 Venda', estorno: '↩ Estorno', entrada: '📦 Entrada', contagem: '☑ Contagem', ajuste: '✎ Ajuste manual', cadastro: '+ Cadastro' };
+  var ORIGENS_EST = { site: 'site', pdv: 'loja', retaguarda: 'retaguarda', manual: 'manual' };
+
+  async function carregarHistorico() {
+    var body = document.getElementById('histBody');
+    body.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Carregando...</h4></td></tr>';
+    var res = await sb.from('estoque_movimentos')
+      .select('id,criado_em,produto_id,variacao_id,quantidade,saldo,motivo,origem,pedido_id,usuario,observacao,produtos(nome,codigo),variacoes(nome)')
+      .order('criado_em', { ascending: false }).limit(500);
+    if (res.error) {
+      body.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Erro</h4><p>' + esc(res.error.message) + '</p></td></tr>';
+      return;
+    }
+    histRows = res.data || [];
+    histCarregado = true;
+    renderHistorico();
+  }
+
+  function verHistoricoProduto(prodId, nome) {
+    document.getElementById('histBusca').value = nome;
+    histFiltroProduto = prodId;
+    setEstAba('hist');
+    renderHistorico();
+  }
+  var histFiltroProduto = null;
+
+  function renderHistorico() {
+    var body = document.getElementById('histBody');
+    if (!histCarregado) return;
+    var termo = (document.getElementById('histBusca').value || '').toLowerCase();
+    if (!termo) histFiltroProduto = null;
+    var mot = document.getElementById('histMotivo').value;
+    var ori = document.getElementById('histOrigem').value;
+    var lista = histRows.filter(function(m) {
+      if (mot && m.motivo !== mot) return false;
+      if (ori && m.origem !== ori) return false;
+      if (histFiltroProduto) return m.produto_id === histFiltroProduto;
+      if (termo) {
+        var n = ((m.produtos && m.produtos.nome) || '') + ' ' + ((m.variacoes && m.variacoes.nome) || '') + ' ' + ((m.produtos && m.produtos.codigo) || '');
+        return n.toLowerCase().indexOf(termo) >= 0;
+      }
+      return true;
+    });
+    if (!lista.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty-table"><h4>Nenhuma movimentação</h4><p>As movimentações passaram a ser registradas a partir de 24/11/2026.</p></td></tr>';
+      return;
+    }
+    body.innerHTML = lista.map(function(m) {
+      var q = num(m.quantidade);
+      var quem = m.pedido_id
+        ? '<a href="javascript:void(0)" onclick="openOrderDetail(' + m.pedido_id + ')" style="color:var(--gold);">pedido ' + esc(m.observacao || '#' + m.pedido_id) + '</a>'
+        : esc((m.usuario || '').split('@')[0] || '—') + (m.observacao ? '<br><small style="color:var(--text-faint);">' + esc(m.observacao) + '</small>' : '');
+      return '<tr>' +
+        '<td style="font-size:12px;white-space:nowrap;">' + new Date(m.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</td>' +
+        '<td><div style="font-weight:600;">' + esc((m.produtos && m.produtos.nome) || '#' + m.produto_id) + (m.variacoes ? ' · ' + esc(m.variacoes.nome) : '') + '</div><small class="mono" style="color:var(--text-faint);letter-spacing:0.05em;">' + esc((m.produtos && m.produtos.codigo) || '') + '</small></td>' +
+        '<td style="font-size:12px;">' + (MOTIVOS_EST[m.motivo] || esc(m.motivo)) + '<br><small style="color:var(--text-faint);">' + esc(ORIGENS_EST[m.origem] || m.origem || '') + '</small></td>' +
+        '<td style="text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:' + (q < 0 ? 'var(--red)' : 'var(--green)') + ';">' + (q > 0 ? '+' : '') + q + '</td>' +
+        '<td style="text-align:right;font-family:\'JetBrains Mono\',monospace;' + (num(m.saldo) < 0 ? 'color:var(--red);' : '') + '">' + (m.saldo === null ? '—' : m.saldo) + '</td>' +
+        '<td style="font-size:12px;">' + quem + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  // ---------- Entrada de mercadoria / contagem ----------
+  var estLanc = null;
+
+  async function abrirLancamentoEstoque(modo) {
+    if (!estCarregado) await carregarEstoque();
+    estLanc = { modo: modo, linhas: [] };
+    var entrada = modo === 'entrada';
+    document.getElementById('estLancTitulo').innerHTML = entrada ? 'Entrada de <em>mercadoria</em>' : 'Contagem / <em>balanço</em>';
+    setText('estLancSub', entrada
+      ? 'O que chegou do fornecedor. A quantidade é SOMADA ao estoque atual.'
+      : 'Conte na prateleira e digite o que tem. O estoque passa a ser EXATAMENTE o contado; a diferença fica no histórico.');
+    setText('estLancColQtd', entrada ? 'Chegou' : 'Contado');
+    setText('estLancObsLbl', entrada ? 'Fornecedor / nota fiscal (opcional)' : 'Observação (opcional)');
+    document.getElementById('estLancObs').value = '';
+    document.getElementById('estLancBusca').value = '';
+    document.getElementById('estLancSug').style.display = 'none';
+    renderLancamento();
+    document.getElementById('estLancModal').classList.add('open');
+    setTimeout(function() { document.getElementById('estLancBusca').focus(); }, 60);
+  }
+
+  var estLancSugLista = [];
+  function estLancSugerir() {
+    var box = document.getElementById('estLancSug');
+    var termo = (document.getElementById('estLancBusca').value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    if (!termo) { box.style.display = 'none'; estLancSugLista = []; return; }
+    var partes = termo.split(/\s+/);
+    var codigoExato = estRows.filter(function(r) { return (r.codigo || '').toLowerCase() === termo; });
+    estLancSugLista = codigoExato.concat(estRows.filter(function(r) {
+      if (codigoExato.indexOf(r) >= 0) return false;
+      var alvo = ((r.codigo || '') + ' ' + nomeEstRow(r)).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      return partes.every(function(p) { return alvo.indexOf(p) >= 0; });
+    })).slice(0, 30);
+    box.innerHTML = estLancSugLista.length ? estLancSugLista.map(function(r, i) {
+      return '<div onclick="estLancEscolher(' + i + ')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;" onmouseenter="this.style.background=\'var(--bg-soft)\'" onmouseleave="this.style.background=\'\'">' +
+        '<span><span class="mono" style="color:var(--text-faint);letter-spacing:0.05em;">' + esc(r.codigo || '') + '</span> ' + esc(nomeEstRow(r)) + '</span>' +
+        '<span style="color:var(--text-dim);font-size:12px;white-space:nowrap;">estoque ' + num(r.estoque) + '</span></div>';
+    }).join('') : '<div style="padding:10px 12px;color:var(--text-faint);">Nenhum produto. Cadastre na aba Produtos.</div>';
+    box.style.display = 'block';
+  }
+
+  function estLancEscolher(i) {
+    var r = estLancSugLista[i];
+    if (!r) return;
+    var key = r.produto_id + '-' + (r.variacao_id || '');
+    var ja = estLanc.linhas.find(function(l) { return l.key === key; });
+    if (!ja) estLanc.linhas.push({ key: key, produto_id: r.produto_id, variacao_id: r.variacao_id, nome: nomeEstRow(r), codigo: r.codigo, atual: num(r.estoque), qtd: '' });
+    document.getElementById('estLancBusca').value = '';
+    document.getElementById('estLancSug').style.display = 'none';
+    renderLancamento();
+    setTimeout(function() {
+      var inp = document.querySelector('#estLancBody input[data-key="' + key + '"]');
+      if (inp) { inp.focus(); inp.select(); }
+    }, 30);
+  }
+
+  function renderLancamento() {
+    var body = document.getElementById('estLancBody');
+    if (!estLanc.linhas.length) {
+      body.innerHTML = '<tr><td colspan="5" class="empty-table" style="padding:24px;"><p>Busque e adicione os produtos acima.</p></td></tr>';
+      return;
+    }
+    var entrada = estLanc.modo === 'entrada';
+    body.innerHTML = estLanc.linhas.map(function(l, i) {
+      var q = l.qtd === '' ? null : parseInt(l.qtd);
+      var fica = q === null || isNaN(q) ? '—' : (entrada ? l.atual + q : q);
+      var dif = (!entrada && q !== null && !isNaN(q)) ? q - l.atual : null;
+      return '<tr>' +
+        '<td><div style="font-weight:600;">' + esc(l.nome) + '</div><small class="mono" style="color:var(--text-faint);letter-spacing:0.05em;">' + esc(l.codigo || '') + '</small></td>' +
+        '<td style="text-align:right;font-family:\'JetBrains Mono\',monospace;">' + l.atual + '</td>' +
+        '<td style="text-align:right;"><input type="number" step="1" ' + (entrada ? 'min="1"' : 'min="0"') + ' data-key="' + esc(l.key) + '" value="' + esc(l.qtd) + '" ' +
+          'oninput="estLanc.linhas[' + i + '].qtd=this.value;renderLancamentoFica(' + i + ')" ' +
+          'onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'estLancBusca\').focus();}" ' +
+          'style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:8px;text-align:right;font-family:\'JetBrains Mono\',monospace;" /></td>' +
+        '<td style="text-align:right;font-family:\'JetBrains Mono\',monospace;" id="estLancFica' + i + '">' + fica + (dif ? ' <small style="color:' + (dif < 0 ? 'var(--red)' : 'var(--green)') + ';">(' + (dif > 0 ? '+' : '') + dif + ')</small>' : '') + '</td>' +
+        '<td><button onclick="estLanc.linhas.splice(' + i + ',1);renderLancamento();" style="color:var(--red);font-size:16px;">×</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function renderLancamentoFica(i) {
+    var l = estLanc.linhas[i];
+    var el = document.getElementById('estLancFica' + i);
+    if (!el) return;
+    var q = parseInt(l.qtd);
+    if (isNaN(q)) { el.textContent = '—'; return; }
+    if (estLanc.modo === 'entrada') { el.textContent = l.atual + q; return; }
+    var dif = q - l.atual;
+    el.innerHTML = q + (dif ? ' <small style="color:' + (dif < 0 ? 'var(--red)' : 'var(--green)') + ';">(' + (dif > 0 ? '+' : '') + dif + ')</small>' : '');
+  }
+
+  async function salvarLancamentoEstoque() {
+    var entrada = estLanc.modo === 'entrada';
+    var itens = estLanc.linhas.map(function(l) {
+      return { produto_id: l.produto_id, variacao_id: l.variacao_id, quantidade: parseInt(l.qtd), nome: l.nome, atual: l.atual };
+    }).filter(function(i) { return !isNaN(i.quantidade) && (entrada ? i.quantidade !== 0 : i.quantidade >= 0); });
+    if (!itens.length) { toast('Preencha as quantidades', 'red'); return; }
+    if (!entrada && itens.some(function(i) { return i.quantidade < 0; })) { toast('Contagem não pode ser negativa', 'red'); return; }
+    var resumo = itens.slice(0, 12).map(function(i) {
+      return '• ' + i.nome + ': ' + (entrada ? '+' + i.quantidade : i.atual + ' → ' + i.quantidade);
+    }).join('\n') + (itens.length > 12 ? '\n… e mais ' + (itens.length - 12) : '');
+    if (!confirm((entrada ? 'Dar entrada em ' : 'Gravar a contagem de ') + itens.length + ' produto(s)?\n\n' + resumo)) return;
+
+    var btn = document.getElementById('estLancSalvar');
+    btn.disabled = true; btn.textContent = 'SALVANDO...';
+    var res = await sb.rpc('estoque_lancar', {
+      p: {
+        motivo: estLanc.modo,
+        observacao: document.getElementById('estLancObs').value.trim(),
+        itens: itens.map(function(i) { return { produto_id: i.produto_id, variacao_id: i.variacao_id, quantidade: i.quantidade }; })
+      }
+    });
+    btn.disabled = false; btn.textContent = 'Salvar';
+    if (res.error) { toast('Erro: ' + res.error.message, 'red'); return; }
+    closeModal('estLancModal');
+    toast((entrada ? 'Entrada' : 'Contagem') + ' gravada · ' + itens.length + ' produto(s)', 'green');
+    histCarregado = false;
+    productsLoaded = false;
+    await carregarEstoque();
+    if (document.getElementById('estPainelHist').style.display !== 'none') carregarHistorico();
   }
 
   // ============================================
